@@ -39,10 +39,10 @@ const char* const vertexSource = R"(
 	precision highp float;		// normal floats, makes no difference on desktop computers
 
 	uniform mat4 MVP;			// uniform variable, the Model-View-Projection transformation matrix
-	layout(location = 0) in vec2 vp;	// Varying input: vp = vertex position is expected in attrib array 0
+	layout(location = 0) in vec3 vp;	// Varying input: vp = vertex position is expected in attrib array 0
 
 	void main() {
-		gl_Position = vec4(vp.x, vp.y, 0, 1) * MVP;		// transform vp from modeling space to normalized device space
+		gl_Position = vec4(vp.x/vp.z, vp.y/vp.z, 0, 1) * MVP;		// transform vp from modeling space to normalized device space
 	}
 )";
 
@@ -71,7 +71,7 @@ class Graph {
 
 	vec2 points[numberOfPoints]; // graf pontjait tarolo lista
 
-	vec3 hyperBolicPoints[numberOfPoints];
+	vec3 hyperbolicPoints[numberOfPoints];
 
 	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt
 		int a;
@@ -81,7 +81,7 @@ class Graph {
 	PointPair edges[numberOfEdges]; // pontok indexei, amik szomszedosak
 
 	std::vector<vec2> edgeCoordinates; // az elek vegpontjainak koordinatai
-
+	std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai
 
 
 public:
@@ -123,7 +123,7 @@ public:
 
 		refreshHyperbolicPoints();
 
-		refreshEdgeCoordinates(points, edgeCoordinates);
+		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 
 		numberOfIntersections(edgeCoordinates);
 
@@ -136,7 +136,7 @@ public:
 
 		glEnableVertexAttribArray(0);  // AttribArray 0
 		glVertexAttribPointer(0,       // vbo -> AttribArray 0
-			2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
+			3, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
 			0, NULL); 		     // stride, offset: tightly packed
 
 
@@ -163,8 +163,8 @@ public:
 		glBindVertexArray(vao);  // Draw call
 
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
-			sizeof(points),  // # bytes
-			&points[0],	      	// address
+			sizeof(hyperbolicPoints),  // # bytes
+			&hyperbolicPoints[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
 
 		glPointSize(10.0);
@@ -175,12 +175,12 @@ public:
 		glUniform3f(colorLocation, 1, 0, 0); // mas szinuek legyenek
 
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
-			sizeof(vec2) * edgeCoordinates.size(),  // # bytes
-			&edgeCoordinates[0],	      	// address
+			sizeof(vec3) * hyperbolicEdgeCoordinates.size(),  // # bytes
+			&hyperbolicEdgeCoordinates[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
 
 
-		glDrawArrays(GL_LINES, 0 /*startIdx*/, edgeCoordinates.size() /*# Elements*/);
+		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
 
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
@@ -192,8 +192,8 @@ public:
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = (((float)rand() / (float)RAND_MAX) * 2) - 1.0f;
-			float yCoordinate = (((float)rand() / (float)RAND_MAX) * 2) - 1.0f;
+			float xCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float yCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] = vec2(xCoordinate, yCoordinate);
 		}
 
@@ -203,15 +203,31 @@ public:
 			printf("%f\n", destinationArray[i].y);
 		}
 	}
-	void refreshEdgeCoordinates(vec2 pointsArray[], std::vector<vec2> &edgeCoordinates) {
+	void refreshEdgeCoordinates(vec3 hyperbolicPointsArray[], std::vector<vec2> &edgeCoordinates, std::vector<vec3>& HyperbolicEdgeCoordinates) {
+		edgeCoordinates.clear();
+		HyperbolicEdgeCoordinates.clear();
+		for (int i = 0; i < numberOfEdges; i++)
+		{
+			printf("%d\n", edges[i].a);
+			printf("%d\n", edges[i].b);
+
+			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].a].x, hyperbolicPointsArray[edges[i].a].y));
+			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].b].x, hyperbolicPointsArray[edges[i].b].y));
+
+			HyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPointsArray[edges[i].a].x, hyperbolicPointsArray[edges[i].a].y, hyperbolicPointsArray[edges[i].a].z));
+			HyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPointsArray[edges[i].b].x, hyperbolicPointsArray[edges[i].b].y, hyperbolicPointsArray[edges[i].b].z));
+
+		}
+	}
+	void refreshEdgeCoordinates(vec2 points[], std::vector<vec2>& edgeCoordinates) {
 		edgeCoordinates.clear();
 		for (int i = 0; i < numberOfEdges; i++)
 		{
 			printf("%d\n", edges[i].a);
 			printf("%d\n", edges[i].b);
 
-			edgeCoordinates.push_back(vec2(pointsArray[edges[i].a].x, pointsArray[edges[i].a].y));
-			edgeCoordinates.push_back(vec2(pointsArray[edges[i].b].x, pointsArray[edges[i].b].y));
+			edgeCoordinates.push_back(vec2(points[edges[i].a].x, points[edges[i].a].y));
+			edgeCoordinates.push_back(vec2(points[edges[i].b].x, points[edges[i].b].y));
 
 		}
 	}
@@ -225,15 +241,15 @@ public:
 			for (int j = 0; j < edgeCoordinates.size(); j += 2)
 			{
 				// az eloadason tanultak alapjan 
-				vec2 iV = edgeCoordinates[i] - edgeCoordinates[i + 1];; // iranyvektor
-				vec2 iN = vec2(-iV.y, iV.x); // normalvektor
+				vec3 iV = edgeCoordinates[i] - edgeCoordinates[i + 1];; // iranyvektor
+				vec3 iN = vec2(-iV.y, iV.x); // normalvektor
 
-				vec2 scalarMult = (iN * (edgeCoordinates[j] - edgeCoordinates[i])) * (iN * (edgeCoordinates[j + 1] - edgeCoordinates[i]));
+				vec3 scalarMult = (iN * (edgeCoordinates[j] - edgeCoordinates[i])) * (iN * (edgeCoordinates[j + 1] - edgeCoordinates[i]));
 
-				vec2 jV = edgeCoordinates[j] - edgeCoordinates[j + 1];; // iranyvektor
-				vec2 jN = vec2(-jV.y, jV.x); // normalvektor
+				vec3 jV = edgeCoordinates[j] - edgeCoordinates[j + 1];; // iranyvektor
+				vec3 jN = vec2(-jV.y, jV.x); // normalvektor
 
-				vec2 scalarMult2 = (jN * (edgeCoordinates[i] - edgeCoordinates[j])) * (jN * (edgeCoordinates[i + 1] - edgeCoordinates[j]));
+				vec3 scalarMult2 = (jN * (edgeCoordinates[i] - edgeCoordinates[j])) * (jN * (edgeCoordinates[i + 1] - edgeCoordinates[j]));
 
 
 				if (scalarMult.x + scalarMult.y < 0 && scalarMult2.x + scalarMult2.y < 0) { // i szakasz vegpontjai az j egyenesenek kulonbozo oldalain vannak es forditva
@@ -252,7 +268,7 @@ public:
 			float x = points[i].x;
 			float y = points[i].y;
 			float w = sqrt((x*x) + (y*y) + 1);
-			hyperBolicPoints[i] = vec3(x, y, w);
+			hyperbolicPoints[i] = vec3(x, y, w);
 			printf("x %f y %f w %f\n", x, y, w);
 		}
 	}
@@ -277,6 +293,8 @@ public:
 			i++;
 		}
 		refreshEdgeCoordinates(points, edgeCoordinates);
+		refreshHyperbolicPoints();
+		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 
 	}
 	bool areNeighbours(int i, int j) {
@@ -353,9 +371,9 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
-		//graph.heuristicArrange();
-		//graph.draw();
-		graph.forceBasedArrange();
+		graph.heuristicArrange();
+		graph.draw();
+		//graph.forceBasedArrange();
 	}
 }
 
