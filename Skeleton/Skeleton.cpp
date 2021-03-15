@@ -297,6 +297,28 @@ public:
 		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 
 	}
+	void heuristicArrange2() {// k means
+		
+		for (int i = 0; i < numberOfPoints; i++)
+		{
+			vec2 sum = vec2(0,0);
+			for (int j = 0; j < numberOfPoints; j++)
+			{
+				if (i == j) continue; /// sajat maga nem szamit
+				if (areNeighbours(i, j)) {
+					sum = sum + points[i]; 
+				}
+				else
+				{
+					sum = sum - points[i];
+				}
+			}
+			points[i] = sum / (numberOfPoints - 1);
+		}
+		
+		refreshHyperbolicPoints();
+		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
+	}
 	bool areNeighbours(int i, int j) {
 		for each (PointPair pair in edges)
 		{
@@ -371,7 +393,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
-		graph.heuristicArrange();
+		graph.heuristicArrange2();
 		graph.draw();
 		//graph.forceBasedArrange();
 	}
