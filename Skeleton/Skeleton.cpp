@@ -125,7 +125,6 @@ public:
 
 		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 
-		numberOfIntersections(edgeCoordinates);
 
 		glGenVertexArrays(1, &vao);	// get 1 vao id
 		glBindVertexArray(vao);		// make it active
@@ -338,7 +337,6 @@ public:
 	float pairForce(float distance) {
 		float optimalDistance = 0.2;
 		return (5 / distance) * 0.5 * ((distance - 0.2) * (distance - 0.2) * (distance - 0.2));
-
 	}
 	float notPairForce(float distance){
 		return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));
@@ -347,33 +345,62 @@ public:
 	float hyperbolicDistance(vec3 a, vec3 b) { return acosh(-lorentz(a, b)); }
 	void forceBasedArrange() { // minden pont tomege 1
 
-		vec2 velocities[numberOfPoints];
-
-
-		for each (vec2 v in velocities) // sebessegvektorok kinullazasa
+		vec3 velocities[numberOfPoints];
+		for each (vec3 v in velocities) // sebessegvektorok kinullazasa
 		{
 			v.x = 0;
 			v.y = 0;
+			v.z = 0;
 		}
-
-		for (int i = 0; i < numberOfPoints; i++)
+		float dt = 0.2;
+		for (float t = 0; t < 1; t += dt) /// ido halad elore
 		{
-			vec2 FPair = vec2(0,0);
-			vec2 FNotPair = vec2(0,0);
-			for (int j = 0; j < numberOfPoints; j++)
+			printf("t: %f\n ", t);
+			for (int i = 0; i < numberOfPoints; i++)
 			{
-				if (areNeighbours(i, j)) {
-					float dist = length(points[j] - points[i]); // i-bol j-be mutato vektor TODO atirni hiperbolikusra
+				vec3 FSum = vec3(0, 0, 0);
+				for (int j = 0; j < numberOfPoints; j++)
+				{
+					if (i == j) continue;
+					float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
 
+					if (areNeighbours(i, j)) {
+						float forceSize = pairForce(dist);
+						vec3 forceDirection = (hyperbolicPoints[j] - hyperbolicPoints[i]) * cosh(dist) / sinh(dist);
+						FSum = FSum + forceDirection * forceSize;
+					}
+					else {
+						float forceSize = notPairForce(dist);
+						vec3 forceDirection = (hyperbolicPoints[j] - hyperbolicPoints[i]) * cosh(dist) / sinh(dist);
+						FSum = FSum + forceDirection * forceSize;
 
-					printf("dist %f force %f\n ",dist, pairForce(dist));
-					/// pozitiv erovel a szummaba
-					//Lorentz()
+					}
 				}
-				else {
-					/// negativ erovel a szummaba
-				}
+				FSum = FSum / (numberOfPoints - 1);
+
+				// v = v + F * m, de m = 1
+				// v = v + F
+				velocities[i] = velocities[i] + FSum;
+
+				// v * t = s
+				float motionDistance = length(velocities[i]) * dt;
+
+				hyperbolicPoints[i] = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
+				// viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
+				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 1) + normalize(velocities[i]) * sinh(motionDistance + 1);
+
+				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
+				vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
+
+				velocities[i] = length(velocities[i]) * newVelocityVector;
+
+				printf("i: %d f: %f\n ", i,  length(FSum));
+
 			}
+			refreshDescartesFromHyperbolic();
+			refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
+			draw();
+
 		}
 	}
 	void move(vec3 hyperbolicMotionVector) {
