@@ -420,47 +420,40 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 
-	motionStartCoordinates = motionEndCoordinates;
-	motionEndCoordinates = vec2(cX, cY);
+	motionEndCoordinates = vec2(cX, cY); 
+	vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
+	if (abs(descartesMotionVector.x) <= 0.0005 || abs(descartesMotionVector.y) <= 0.0005) {/// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+		return;									///  ezert ilyen kis eltolast nem engedek meg
+ 	}
 
-	float tempX = (motionEndCoordinates - motionStartCoordinates).x;
-	float tempY = (motionEndCoordinates - motionStartCoordinates).y;
-	/*if (abs((motionEndCoordinates - motionStartCoordinates).x) <= FLT_MIN) {
-		tempX = 0.0002;
-	}
-	if (abs((motionEndCoordinates - motionStartCoordinates).y) <= FLT_MIN) {
-		tempY = 0.0002;
-	}
-	*/
+	vec3 hyperbolicMotionVector = graph.descartesToHyperbolic(descartesMotionVector); // az eltolas vektor hiperbolikus geometriaban
+	float hyperbolicMotionVectorLength = graph.hyperbolicDistance(hyperbolicMotionVector, vec3(0, 0, 1)); // az eltolas hossza
+	vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * cosh(hyperbolicMotionVectorLength)) / sinh(hyperbolicMotionVectorLength); /// a hiperbola origojaban ervenyes iranyvektor
 	
-	vec2 shiftPoint2D = vec2(tempX, tempY);
-	vec3 shiftPointHyperbolic = graph.descartesToHyperbolic(shiftPoint2D);
-
-	vec3 hyperbolicOrigo = vec3(0, 0, 1);
-	float shiftVectorDistance = graph.hyperbolicDistance(shiftPointHyperbolic, hyperbolicOrigo);
-
-	printf("\nuj: %f", shiftVectorDistance);
-	vec3 shiftVectorVelocity = (shiftPointHyperbolic - hyperbolicOrigo * cosh(shiftVectorDistance)) / sinh(shiftVectorDistance); 
-	
-	vec3 mirrorPoint1 = hyperbolicOrigo * cosh(shiftVectorDistance * 0.25) + shiftVectorVelocity * sinh(shiftVectorDistance * 0.25);
-	vec3 mirrorPoint2= hyperbolicOrigo * cosh(shiftVectorDistance * 0.75) + shiftVectorVelocity * sinh(shiftVectorDistance * 0.75);
+	// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
+	vec3 m1 = vec3(0, 0, 1);
+	vec3 m2= vec3(0, 0, 1) * cosh(hyperbolicMotionVectorLength * 0.50) + hyperbolicMotionVectorDirection * sinh(hyperbolicMotionVectorLength * 0.50);
 
 	for (int i = 0; i < numberOfPoints; i++)
 	{
-		float m1Distance = graph.hyperbolicDistance(mirrorPoint1, graph.hyperbolicPoints[i]);
-		vec3 m1Velocity = (mirrorPoint1 - graph.hyperbolicPoints[i] * cosh(m1Distance)) / sinh(m1Distance);
-		vec3 vertexMirrored1 = graph.hyperbolicPoints[i] * cosh(2 * m1Distance) + m1Velocity * sinh(2 * m1Distance);
+		// pont tukrozese m1-re
+		float m1Distance = graph.hyperbolicDistance(m1, graph.hyperbolicPoints[i]); // a tavolsag a pont es m1 kozott
 
-		float m2Distance = graph.hyperbolicDistance(mirrorPoint2, vertexMirrored1);
-		vec3 m2Velocity = (mirrorPoint2 - vertexMirrored1 * cosh(m2Distance)) / sinh(m2Distance);
-		vec3 vertexMirrored2 = vertexMirrored1 * cosh(2 * m2Distance) + m2Velocity * sinh(2 * m2Distance);
+		vec3 m1Direction = (m1 - graph.hyperbolicPoints[i] * cosh(m1Distance)) / sinh(m1Distance); // az adott pontban ervenyes iranyvektor az m1 pont fele
+		vec3 pointM1Mirror = graph.hyperbolicPoints[i] * cosh(2 * m1Distance) + m1Direction * sinh(2 * m1Distance);
 
-		graph.hyperbolicPoints[i] = vertexMirrored2;
-		//printf("\nuj: %f %f %f", vertexMirrored2.x, vertexMirrored2.y, vertexMirrored2.z);
+		// m1-re tukrozott pont tukrozese m2-re
+		float m2Distance = graph.hyperbolicDistance(m2, pointM1Mirror);
+		vec3 m2Direction = (m2 - pointM1Mirror * cosh(m2Distance)) / sinh(m2Distance);
+		vec3 pointM2Mirror = pointM1Mirror * cosh(2 * m2Distance) + m2Direction * sinh(2 * m2Distance);
+
+		graph.hyperbolicPoints[i] = pointM2Mirror; // az igy kapott pont lesz az uj pozicioja
+		
 	}
 	graph.refreshDescartesFromHyperbolic();
 	graph.refreshEdgeCoordinates(graph.hyperbolicPoints, graph.edgeCoordinates, graph.hyperbolicEdgeCoordinates);
 	graph.draw();
+	motionStartCoordinates = motionEndCoordinates; // a kovetkezo lefutasnal a mar megtortent eltolast ne csinalja meg ujra
 
 }
 
