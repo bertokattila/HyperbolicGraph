@@ -68,7 +68,7 @@ const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) *
 
 class Graph {
 
-
+public:
 	vec2 points[numberOfPoints]; // graf pontjait tarolo lista
 
 	vec3 hyperbolicPoints[numberOfPoints];
@@ -84,7 +84,7 @@ class Graph {
 	std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai
 
 
-public:
+
 	void create() {
 
 		generateNewCoordinates(1, points);
@@ -192,8 +192,8 @@ public:
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			float yCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float xCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float yCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] = vec2(xCoordinate, yCoordinate);
 		}
 
@@ -231,6 +231,13 @@ public:
 
 		}
 	}
+	void refreshDescartesFromHyperbolic() {
+		for (int i = 0; i < numberOfPoints; i++)
+		{
+			points[i].x = hyperbolicPoints[i].x;
+			points[i].y = hyperbolicPoints[i].y;
+		}
+	}
 	int numberOfIntersections(std::vector<vec2> edgeCoordinates) {
 
 		// egymast koveto ketto koordinata reprezental egy szakaszt pl 0-1; 2-3 ...
@@ -265,12 +272,14 @@ public:
 	void refreshHyperbolicPoints() {
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			float x = points[i].x;
-			float y = points[i].y;
-			float w = sqrt((x*x) + (y*y) + 1);
-			hyperbolicPoints[i] = vec3(x, y, w);
-			printf("x %f y %f w %f\n", x, y, w);
+			hyperbolicPoints[i] = descartesToHyperbolic(points[i]);
 		}
+	}
+	vec3 descartesToHyperbolic(vec2 descartes) {
+		float x = descartes.x;
+		float y = descartes.y;
+		float w = sqrt((x * x) + (y * y) + 1);
+		return vec3(x, y, w);
 	}
 	void heuristicArrange() {
 		int i = 0;
@@ -306,11 +315,11 @@ public:
 			{
 				if (i == j) continue; /// sajat maga nem szamit
 				if (areNeighbours(i, j)) {
-					sum = sum + points[i]; 
+					sum = sum + points[j]; 
 				}
 				else
 				{
-					sum = sum - points[i];
+					sum = sum - points[j];
 				}
 			}
 			points[i] = sum / (numberOfPoints - 1);
@@ -332,8 +341,10 @@ public:
 
 	}
 	float notPairForce(float distance){
-
+		return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));
 	}
+	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
+	float hyperbolicDistance(vec3 a, vec3 b) { return acosh(-lorentz(a, b)); }
 	void forceBasedArrange() { // minden pont tomege 1
 
 		vec2 velocities[numberOfPoints];
@@ -352,9 +363,12 @@ public:
 			for (int j = 0; j < numberOfPoints; j++)
 			{
 				if (areNeighbours(i, j)) {
-					float dist = length(points[j] - points[i]); // i-bol j-be mutato vektor
+					float dist = length(points[j] - points[i]); // i-bol j-be mutato vektor TODO atirni hiperbolikusra
+
+
 					printf("dist %f force %f\n ",dist, pairForce(dist));
 					/// pozitiv erovel a szummaba
+					//Lorentz()
 				}
 				else {
 					/// negativ erovel a szummaba
@@ -395,16 +409,59 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 	if (key == 32) {
 		graph.heuristicArrange2();
 		graph.draw();
-		//graph.forceBasedArrange();
+		graph.forceBasedArrange();
 	}
 }
 
+vec2 motionStartCoordinates, motionEndCoordinates;
 // Move mouse with key pressed
 void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
 	// Convert to normalized device space
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-	printf("Mouse moved to (%3.2f, %3.2f)\n", cX, cY);
+
+	motionStartCoordinates = motionEndCoordinates;
+	motionEndCoordinates = vec2(cX, cY);
+
+	float tempX = (motionEndCoordinates - motionStartCoordinates).x;
+	float tempY = (motionEndCoordinates - motionStartCoordinates).y;
+	/*if (abs((motionEndCoordinates - motionStartCoordinates).x) <= FLT_MIN) {
+		tempX = 0.0002;
+	}
+	if (abs((motionEndCoordinates - motionStartCoordinates).y) <= FLT_MIN) {
+		tempY = 0.0002;
+	}
+	*/
+	
+	vec2 shiftPoint2D = vec2(tempX, tempY);
+	vec3 shiftPointHyperbolic = graph.descartesToHyperbolic(shiftPoint2D);
+
+	vec3 hyperbolicOrigo = vec3(0, 0, 1);
+	float shiftVectorDistance = graph.hyperbolicDistance(shiftPointHyperbolic, hyperbolicOrigo);
+
+	printf("\nuj: %f", shiftVectorDistance);
+	vec3 shiftVectorVelocity = (shiftPointHyperbolic - hyperbolicOrigo * cosh(shiftVectorDistance)) / sinh(shiftVectorDistance); 
+	
+	vec3 mirrorPoint1 = hyperbolicOrigo * cosh(shiftVectorDistance * 0.25) + shiftVectorVelocity * sinh(shiftVectorDistance * 0.25);
+	vec3 mirrorPoint2= hyperbolicOrigo * cosh(shiftVectorDistance * 0.75) + shiftVectorVelocity * sinh(shiftVectorDistance * 0.75);
+
+	for (int i = 0; i < numberOfPoints; i++)
+	{
+		float m1Distance = graph.hyperbolicDistance(mirrorPoint1, graph.hyperbolicPoints[i]);
+		vec3 m1Velocity = (mirrorPoint1 - graph.hyperbolicPoints[i] * cosh(m1Distance)) / sinh(m1Distance);
+		vec3 vertexMirrored1 = graph.hyperbolicPoints[i] * cosh(2 * m1Distance) + m1Velocity * sinh(2 * m1Distance);
+
+		float m2Distance = graph.hyperbolicDistance(mirrorPoint2, vertexMirrored1);
+		vec3 m2Velocity = (mirrorPoint2 - vertexMirrored1 * cosh(m2Distance)) / sinh(m2Distance);
+		vec3 vertexMirrored2 = vertexMirrored1 * cosh(2 * m2Distance) + m2Velocity * sinh(2 * m2Distance);
+
+		graph.hyperbolicPoints[i] = vertexMirrored2;
+		//printf("\nuj: %f %f %f", vertexMirrored2.x, vertexMirrored2.y, vertexMirrored2.z);
+	}
+	graph.refreshDescartesFromHyperbolic();
+	graph.refreshEdgeCoordinates(graph.hyperbolicPoints, graph.edgeCoordinates, graph.hyperbolicEdgeCoordinates);
+	graph.draw();
+
 }
 
 // Mouse click event
@@ -413,7 +470,13 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 
-	char* buttonStat;
+	if (button == GLUT_LEFT_BUTTON) {
+		motionStartCoordinates = vec2(cX, cY);
+		printf("\nklikk %f %f", cX, cY);
+	}
+
+
+	/*char* buttonStat;
 	switch (state) {
 	case GLUT_DOWN: buttonStat = "pressed"; break;
 	case GLUT_UP:   buttonStat = "released"; break;
@@ -424,6 +487,7 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
 	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
 	}
+	*/
 }
 
 // Idle event indicating that some time elapsed: do animation here
