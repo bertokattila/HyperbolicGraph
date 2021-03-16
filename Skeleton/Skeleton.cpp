@@ -388,7 +388,6 @@ public:
 		{
 			// pont tukrozese m1-re
 			float m1Distance = hyperbolicDistance(m1, hyperbolicPoints[i]); // a tavolsag a pont es m1 kozott
-
 			vec3 m1Direction = (m1 - hyperbolicPoints[i] * cosh(m1Distance)) / sinh(m1Distance); // az adott pontban ervenyes iranyvektor az m1 pont fele
 			vec3 pointM1Mirror = hyperbolicPoints[i] * cosh(2 * m1Distance) + m1Direction * sinh(2 * m1Distance);
 
@@ -398,7 +397,6 @@ public:
 			vec3 pointM2Mirror = pointM1Mirror * cosh(2 * m2Distance) + m2Direction * sinh(2 * m2Distance);
 
 			hyperbolicPoints[i] = pointM2Mirror; // az igy kapott pont lesz az uj pozicioja
-
 		}
 		refreshDescartesFromHyperbolic();
 		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
