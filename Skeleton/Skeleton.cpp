@@ -198,8 +198,8 @@ public:
 
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			printf("%f\n", destinationArray[i].x);
-			printf("%f\n", destinationArray[i].y);
+			//printf("%f\n", destinationArray[i].x);
+			//printf("%f\n", destinationArray[i].y);
 		}
 	}
 	void refreshEdgeCoordinates(vec3 hyperbolicPointsArray[], std::vector<vec2> &edgeCoordinates, std::vector<vec3>& HyperbolicEdgeCoordinates) {
@@ -207,8 +207,8 @@ public:
 		HyperbolicEdgeCoordinates.clear();
 		for (int i = 0; i < numberOfEdges; i++)
 		{
-			printf("%d\n", edges[i].a);
-			printf("%d\n", edges[i].b);
+			//printf("%d\n", edges[i].a);
+			//printf("%d\n", edges[i].b);
 
 			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].a].x, hyperbolicPointsArray[edges[i].a].y));
 			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].b].x, hyperbolicPointsArray[edges[i].b].y));
@@ -222,8 +222,8 @@ public:
 		edgeCoordinates.clear();
 		for (int i = 0; i < numberOfEdges; i++)
 		{
-			printf("%d\n", edges[i].a);
-			printf("%d\n", edges[i].b);
+			//printf("%d\n", edges[i].a);
+			//printf("%d\n", edges[i].b);
 
 			edgeCoordinates.push_back(vec2(points[edges[i].a].x, points[edges[i].a].y));
 			edgeCoordinates.push_back(vec2(points[edges[i].b].x, points[edges[i].b].y));
@@ -377,6 +377,10 @@ public:
 					}
 				}
 				FSum = FSum / (numberOfPoints - 1);
+				if (abs(length(FSum / (numberOfPoints - 1))) <= 0.002) {
+					FSum = vec3(0,0,0);
+				}
+				
 
 				// v = v + F * m, de m = 1
 				// v = v + F
@@ -460,7 +464,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
-		graph.heuristicArrange2();
+		//graph.heuristicArrange2();
 		graph.draw();
 		graph.forceBasedArrange();
 	}
