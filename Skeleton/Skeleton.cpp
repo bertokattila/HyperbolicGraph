@@ -338,9 +338,7 @@ public:
 		float optimalDistance = 0.2;
 		return (5 / distance) * 0.5 * ((distance - 0.8) * (distance - 0.8) * (distance - 0.8));
 	}
-	float notPairForce(float distance){
-		return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));
-	}
+	float notPairForce(float distance){return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
 	void forceBasedArrange() { // minden pont tomege 1
