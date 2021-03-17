@@ -62,8 +62,8 @@ const char* const fragmentSource = R"(
 GPUProgram gpuProgram; // vertex and fragment shaders
 unsigned int vao;	   // virtual world on the GPU
 
-const int numberOfPoints = 2;
-const int numberOfEdges = 1; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) * 0.05
+const int numberOfPoints = 50;
+const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) * 0.05
 
 
 class Graph {
@@ -336,7 +336,7 @@ public:
 	}
 	float pairForce(float distance) {
 		float optimalDistance = 0.2;
-		return (5 / distance) * 0.5 * ((distance - 0.2) * (distance - 0.2) * (distance - 0.2));
+		return (5 / distance) * 0.5 * ((distance - 0.8) * (distance - 0.8) * (distance - 0.8));
 	}
 	float notPairForce(float distance){
 		return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));
@@ -381,6 +381,7 @@ public:
 							}*/
 						}
 					else {
+						continue; // ideiglenes
 						float forceSize = notPairForce(dist);
 						vec3 forceDirection = (hyperbolicPoints[j] - hyperbolicPoints[i]) * coshf(dist) / sinhf(dist);
 						FSum = FSum + forceDirection * forceSize;
@@ -434,7 +435,7 @@ public:
 				printf("\n%d\n", i);
 				// v * t = s
 				float motionDistance = length(velocities[i]) * dt;
-				if (abs(motionDistance) < 0.002) { continue;  }
+				if (abs(motionDistance) < 0.05) { continue;  }
 				vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
 				if (abs(hyperbolicPointsTemp.x) < 0.002) {
 					hyperbolicPointsTemp.x = 0;
@@ -448,7 +449,7 @@ public:
 				//printf("\ni : %d x: %f y: %f z: %f", i, hyperbolicPointsTemp.x, hyperbolicPointsTemp.y, hyperbolicPointsTemp.z);
 			
 				// viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
-				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 1) + normalize(velocities[i]) * sinh(motionDistance + 1);
+				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2);
 				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
 				printf("\n motionDist %f ", motionDistance);
 				printf("\n point x: %f, y: %f, z: %f ", hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z);
@@ -456,8 +457,9 @@ public:
 				printf("\n anOtherPointThatDirection vx: %f, vy: %f, vz: %f ", anOtherPointThatDirection.x, anOtherPointThatDirection.y, anOtherPointThatDirection.z);
 				
 				hyperbolicPoints[i] = hyperbolicPointsTemp;
-				printf("\n 1legyen: %f ", hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
-				vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
+				
+				vec3 newVelocityVector = normalize((anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection)));
+				printf("\n 1legyen: %f ", length(normalize(newVelocityVector)));
 				printf("\n newVelocityVector vx: %f, vy: %f, vz: %f ", newVelocityVector.x, newVelocityVector.y, newVelocityVector.z);
 				velocities[i] = length(velocities[i]) * newVelocityVector;
 			}
@@ -526,7 +528,7 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
-		//graph.heuristicArrange2();
+		graph.heuristicArrange2();
 		graph.draw();
 		graph.forceBasedArrange();
 	}
