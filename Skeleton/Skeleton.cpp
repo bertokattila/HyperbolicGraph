@@ -149,7 +149,7 @@ public:
 		}
 
 		/// Innentol az elek rajzolasa
-		glUniform3f(colorLocation, 1, 0, 0); // mas szinuek legyenek
+		glUniform3f(colorLocation, 1, 1, 0); // mas szinuek legyenek
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(vec3) * hyperbolicEdgeCoordinates.size(),  // # bytes
 			&hyperbolicEdgeCoordinates[0],	      	// address
@@ -165,7 +165,7 @@ public:
 			for (int i = 0; i < 20; i++)
 			{
 				float angleRad = 2.0f * M_PI * i / 20;
-				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.03, sinf(angleRad) * 0.03);
+				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.05, sinf(angleRad) * 0.05);
 				circlePointsHyperbolic[i] = descartesToHyperbolic(circlePoints[i]);
 			}
 
@@ -181,8 +181,8 @@ public:
 		for (int i = 0; i < numberOfPoints; i++)	// graf pontjainak generalasa
 		{
 			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			float yCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float yCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
