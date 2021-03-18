@@ -214,10 +214,10 @@ public:
 		{
 			v.x = 0; v.y = 0; v.z = 0;
 		}
-		float dt = 0.05;
+		float dt = 0.03;
 		for (float t = 0; t < 1; t += dt) /// ido halad elore
 		{
-			printf("\n\nt: %f\n\n ", t);
+			//printf("\n\nt: %f\n\n ", t);
 			for (int i = 0; i < numberOfPoints; i++)
 			{
 				vec3 FSum = vec3(0, 0, 0);
@@ -254,15 +254,13 @@ public:
 				if (abs(FSum.z * dt) < 0.002) {
 					FSum.z = 0;
 				}
-
 				// v = v + F * m, de m = 1
-				// v = v + F
 				velocities[i] = velocities[i] + FSum *dt;
 			}
 			// mozgatas es a sebessegvektor az uj pont erintosikjaba allitasa
 			for (int i = 0; i < numberOfPoints; i++)
 			{
-				printf("\n%d\n", i);
+				//printf("\n%d\n", i);
 				// v * t = s
 				float motionDistance = length(velocities[i]) * dt;
 				if (abs(motionDistance) < 0.05) { continue;  }
@@ -335,6 +333,7 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
 		graph.heuristicArrange();
+		
 		graph.draw();
 		graph.forceBasedArrange();
 	}
@@ -370,5 +369,6 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 
 // Idle event indicating that some time elapsed: do animation here
 void onIdle() {
+	graph.draw();
 	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
 }
