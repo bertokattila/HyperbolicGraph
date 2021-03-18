@@ -65,47 +65,32 @@ unsigned int vao;	   // virtual world on the GPU
 const int numberOfPoints = 50;
 const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) * 0.05
 
-
 class Graph {
-
 public:
-	vec2 points[numberOfPoints]; // graf pontjait tarolo lista
-	vec3 hyperbolicPoints[numberOfPoints];
+	vec3 hyperbolicPoints[numberOfPoints]; /// a pontok (homogen) koordinatai
 	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt
 		int a;
 		int b;
 	};
 
 	PointPair edges[numberOfEdges]; // pontok indexei, amik szomszedosak
-
-	std::vector<vec2> edgeCoordinates; // az elek vegpontjainak koordinatai
 	std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai
 
-
-
 	void create() {
-
-		generateNewCoordinates(1, points);
+		generateNewCoordinates(1, hyperbolicPoints);
 
 		// graf eleinek generalasa
 		for (int i = 0; i < numberOfEdges; i++)
 		{
 			bool edgeAlreadyExists = true;
-
 			int a;
 			int b;
-
 			while (edgeAlreadyExists)
 			{
-				// Random parok generalasa 0 es 49 koze
-				a = rand() % numberOfPoints;
+				a = rand() % numberOfPoints; // Random parok generalasa 0 es 49 koze
 				b = rand() % numberOfPoints;
-
 				if (a == b) continue;
-
-				// le kell ellenorizni, hogy letezik-e mar az el
-				// i db mar letezo el van, ezert addig kell futnia a ciklusnak
-				edgeAlreadyExists = false;
+				edgeAlreadyExists = false;// le kell ellenorizni, hogy letezik-e mar az el, i db mar letezo el van, ezert addig kell futnia a ciklusnak
 				for (int j = 0; j < i; j++)
 				{
 					if (edges[i].a == a && edges[i].b == b || edges[i].a == b && edges[i].b == a) {
@@ -114,15 +99,9 @@ public:
 					}
 				}
 			}
-			
 			edges[i].a = a;
 			edges[i].b = b;
 		}
-
-		refreshHyperbolicPoints();
-
-		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
-
 
 		glGenVertexArrays(1, &vao);	// get 1 vao id
 		glBindVertexArray(vao);		// make it active
@@ -136,10 +115,8 @@ public:
 			3, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
 			0, NULL); 		     // stride, offset: tightly packed
 
-
 		// create program for the GPU
 		gpuProgram.create(vertexSource, fragmentSource, "outColor");
-		
 	}
 	void draw() {
 		glClearColor(0, 0, 0, 0);     // background color
@@ -164,6 +141,13 @@ public:
 		glPointSize(10.0);
 		glDrawArrays(GL_POINTS, 0 /*startIdx*/, numberOfPoints /*# Elements*/);
 
+		hyperbolicEdgeCoordinates.clear();
+		for (int i = 0; i < numberOfEdges; i++)
+		{
+			hyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPoints[edges[i].a].x, hyperbolicPoints[edges[i].a].y, hyperbolicPoints[edges[i].a].z));
+			hyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPoints[edges[i].b].x, hyperbolicPoints[edges[i].b].y, hyperbolicPoints[edges[i].b].z));
+		}
+
 		/// Innentol az elek rajzolasa
 		glUniform3f(colorLocation, 1, 0, 0); // mas szinuek legyenek
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
@@ -173,95 +157,15 @@ public:
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
-	void generateNewCoordinates(int seed, vec2 destinationArray[]) {
-
-		srand(seed); // muszaj frissiteni, kulonben nem mukodik a heurisztikus rendezo
-
+	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
+		srand(seed);
 		// graf pontjainak generalasa
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			// Random koordinatak generalasa -1 es 1 koze
 			float xCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			float yCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			destinationArray[i] = vec2(xCoordinate, yCoordinate);
-		}
-
-		for (int i = 0; i < numberOfPoints; i++)
-		{
-			//printf("%f\n", destinationArray[i].x);
-			//printf("%f\n", destinationArray[i].y);
-		}
-	}
-	void refreshEdgeCoordinates(vec3 hyperbolicPointsArray[], std::vector<vec2> &edgeCoordinates, std::vector<vec3>& HyperbolicEdgeCoordinates) {
-		edgeCoordinates.clear();
-		HyperbolicEdgeCoordinates.clear();
-		for (int i = 0; i < numberOfEdges; i++)
-		{
-			//printf("%d\n", edges[i].a);
-			//printf("%d\n", edges[i].b);
-
-			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].a].x, hyperbolicPointsArray[edges[i].a].y));
-			edgeCoordinates.push_back(vec2(hyperbolicPointsArray[edges[i].b].x, hyperbolicPointsArray[edges[i].b].y));
-
-			HyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPointsArray[edges[i].a].x, hyperbolicPointsArray[edges[i].a].y, hyperbolicPointsArray[edges[i].a].z));
-			HyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPointsArray[edges[i].b].x, hyperbolicPointsArray[edges[i].b].y, hyperbolicPointsArray[edges[i].b].z));
-
-		}
-	}
-	void refreshEdgeCoordinates(vec2 points[], std::vector<vec2>& edgeCoordinates) {
-		edgeCoordinates.clear();
-		for (int i = 0; i < numberOfEdges; i++)
-		{
-			//printf("%d\n", edges[i].a);
-			//printf("%d\n", edges[i].b);
-
-			edgeCoordinates.push_back(vec2(points[edges[i].a].x, points[edges[i].a].y));
-			edgeCoordinates.push_back(vec2(points[edges[i].b].x, points[edges[i].b].y));
-
-		}
-	}
-	void refreshDescartesFromHyperbolic() {
-		for (int i = 0; i < numberOfPoints; i++)
-		{
-			points[i].x = hyperbolicPoints[i].x;
-			points[i].y = hyperbolicPoints[i].y;
-		}
-	}
-	int numberOfIntersections(std::vector<vec2> edgeCoordinates) {
-
-		// egymast koveto ketto koordinata reprezental egy szakaszt pl 0-1; 2-3 ...
-		// az igy megtalalt metszesek szamat 2 vel kell osztani, hiszen az algoritmus 2x szamolja az osszeset
-		int numberOfIntersections = 0;
-		for (int i = 0; i < edgeCoordinates.size(); i+=2)
-		{
-			for (int j = 0; j < edgeCoordinates.size(); j += 2)
-			{
-				// az eloadason tanultak alapjan 
-				vec3 iV = edgeCoordinates[i] - edgeCoordinates[i + 1];; // iranyvektor
-				vec3 iN = vec2(-iV.y, iV.x); // normalvektor
-
-				vec3 scalarMult = (iN * (edgeCoordinates[j] - edgeCoordinates[i])) * (iN * (edgeCoordinates[j + 1] - edgeCoordinates[i]));
-
-				vec3 jV = edgeCoordinates[j] - edgeCoordinates[j + 1];; // iranyvektor
-				vec3 jN = vec2(-jV.y, jV.x); // normalvektor
-
-				vec3 scalarMult2 = (jN * (edgeCoordinates[i] - edgeCoordinates[j])) * (jN * (edgeCoordinates[i + 1] - edgeCoordinates[j]));
-
-
-				if (scalarMult.x + scalarMult.y < 0 && scalarMult2.x + scalarMult2.y < 0) { // i szakasz vegpontjai az j egyenesenek kulonbozo oldalain vannak es forditva
-					numberOfIntersections++;
-				}
-				
-			}
-		}
-		numberOfIntersections = numberOfIntersections / 2;
-		printf("intersections: %d\n", numberOfIntersections);
-		return numberOfIntersections;
-	}
-	void refreshHyperbolicPoints() {
-		for (int i = 0; i < numberOfPoints; i++)
-		{
-			hyperbolicPoints[i] = descartesToHyperbolic(points[i]);
+			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
 	vec3 descartesToHyperbolic(vec2 descartes) {
@@ -270,33 +174,7 @@ public:
 		float w = sqrt((x * x) + (y * y) + 1);
 		return vec3(x, y, w);
 	}
-	void heuristicArrange() {
-		int i = 0;
-		int bestNumberOfInteresections = numberOfIntersections(edgeCoordinates);
-		//vec2 bestPoints[numberOfPoints];
-		//std::vector<vec2> bestEdgeCoordinates;
-
-		vec2 tmpPoints[numberOfPoints];
-		std::vector<vec2> tmpEdgeCoordinates;
-		for (int i = 0; i < 10; i++)
-		{
-			tmpEdgeCoordinates.clear();
-			generateNewCoordinates(i, tmpPoints);
-			refreshEdgeCoordinates(tmpPoints, tmpEdgeCoordinates);
-			if (numberOfIntersections(tmpEdgeCoordinates) < bestNumberOfInteresections) {
-				memcpy(points, tmpPoints, sizeof(points));
-				bestNumberOfInteresections = numberOfIntersections(tmpEdgeCoordinates);
-			}
-
-			i++;
-		}
-		refreshEdgeCoordinates(points, edgeCoordinates);
-		refreshHyperbolicPoints();
-		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
-
-	}
-	void heuristicArrange2() {// k means
-		
+	void heuristicArrange() {// k means
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec2 sum = vec2(0,0);
@@ -304,18 +182,16 @@ public:
 			{
 				if (i == j) continue; /// sajat maga nem szamit
 				if (areNeighbours(i, j)) {
-					sum = sum + points[j]; 
+					sum = sum + vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 				else
 				{
-					sum = sum - points[j];
+					sum = sum - vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 			}
-			points[i] = sum / (numberOfPoints - 1);
+			sum = sum / (numberOfPoints - 1);
+			hyperbolicPoints[i] = descartesToHyperbolic(sum);
 		}
-		
-		refreshHyperbolicPoints();
-		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 	}
 	bool areNeighbours(int i, int j) {
 		for each (PointPair pair in edges)
@@ -451,10 +327,6 @@ public:
 				printf("\n newVelocityVector vx: %f, vy: %f, vz: %f ", newVelocityVector.x, newVelocityVector.y, newVelocityVector.z);
 				velocities[i] = length(velocities[i]) * newVelocityVector;
 			}
-
-
-			refreshDescartesFromHyperbolic();
-			refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 			draw();
 
 		}
@@ -478,8 +350,6 @@ public:
 			vec3 firstMirrored = hyperbolicMirror(hyperbolicPoints[i], m1); // pont tukrozese m1-re
 			hyperbolicPoints[i] = hyperbolicMirror(firstMirrored, m2); // m1-re tukrozott pont tukrozese m2-re, az igy kapott pont lesz az uj pozicioja
 		}
-		refreshDescartesFromHyperbolic();
-		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
 		draw();
 	}
 };
@@ -506,9 +376,9 @@ void onKeyboard(unsigned char key, int pX, int pY) {
 void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
-		graph.heuristicArrange2();
+		graph.heuristicArrange();
 		graph.draw();
-		graph.forceBasedArrange();
+		//graph.forceBasedArrange();
 	}
 }
 
