@@ -202,31 +202,24 @@ public:
 	}
 	float pairForce(float distance) {
 		float optimalDistance = 0.2;
-		return (5 / distance) * 0.5 * ((distance - 0.8) * (distance - 0.8) * (distance - 0.8));
+		return 0.5 * ((distance - 1) * (distance - 1) * (distance - 1));
 	}
-	float notPairForce(float distance){return 1 / (-1 * ((sqrt(distance) * 10) * ((sqrt(distance) * 10))));}
+	float notPairForce(float distance){return 0.02 + 0.07 / (-1 * (sqrt(distance + 0.1) * (sqrt(distance + 0.1))));}
+	float origoForce(float distance) { return 0.1 * distance * distance * distance; }
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
 	void forceBasedArrange() { // minden pont tomege 1
-
 		vec3 velocities[numberOfPoints];
 		for each (vec3 v in velocities) // sebessegvektorok kinullazasa
 		{
-			v.x = 0;
-			v.y = 0;
-			v.z = 0;
+			v.x = 0; v.y = 0; v.z = 0;
 		}
-		float dt = 0.2;
+		float dt = 0.05;
 		for (float t = 0; t < 1; t += dt) /// ido halad elore
 		{
 			printf("\n\nt: %f\n\n ", t);
 			for (int i = 0; i < numberOfPoints; i++)
 			{
-
-				//if (fabs(t - 0.4) < t * .001){
-					//printf("\ni : %d x %f y: %f z: %f ", i,  hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z);
-
-				//}
 				vec3 FSum = vec3(0, 0, 0);
 				for (int j = 0; j < numberOfPoints; j++)
 				{
@@ -235,38 +228,22 @@ public:
 
 					if (areNeighbours(i, j)) {
 						float forceSize = pairForce(dist);
-						vec3 forceDirection = (hyperbolicPoints[j] - hyperbolicPoints[i]) * coshf(dist) / sinhf(dist);
+						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+						//printf("lorentz: %f\n", lorentz(forceDirection, hyperbolicPoints[i]));
+						// printf("pairforce: %f dist: %f\n", forceSize, dist);
 						FSum = FSum + forceDirection * forceSize;
-							/*if (i == 11) {
-								printf("\n");
-								printf("\n FSumx: %f, FSumy: %f, FSumz: %f ", FSum.x, FSum.y, FSum.z);
-								printf("\ni : %d j: %d dx %f fdy: %f fdz: %f dist: %f", i, j,  forceDirection.x, forceDirection.y, forceDirection.z, dist);
-								printf("\ni : %d j: %d ix %f iy: %f iz: %f  jx %f jy: %f jz: %f dist: %f", i, j, hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z, hyperbolicPoints[j].x, hyperbolicPoints[j].y, hyperbolicPoints[j].z, dist);
-							}*/
 						}
 					else {
-						continue; // ideiglenes
 						float forceSize = notPairForce(dist);
-						vec3 forceDirection = (hyperbolicPoints[j] - hyperbolicPoints[i]) * coshf(dist) / sinhf(dist);
+						//printf("notpairforce: %f dist: %f\n",forceSize, dist);
+						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
 						FSum = FSum + forceDirection * forceSize;
-						/*if (i == 11) {
-							printf("\n");
-							printf("\n FSumx: %f, FSumy: %f, FSumz: %f ", FSum.x, FSum.y, FSum.z);
-							printf("\ni : %d j: %d dx %f fdy: %f fdz: %f dist: %f", i, j,  forceDirection.x, forceDirection.y, forceDirection.z, dist);
-							printf("\ni : %d j: %d ix %f iy: %f iz: %f  jx %f jy: %f jz: %f dist: %f", i, j, hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z, hyperbolicPoints[j].x, hyperbolicPoints[j].y, hyperbolicPoints[j].z, dist);
-						}*/
-						//printf("\ni : %d j: %d ix %f iy: %f iz: %f  jx %f jy: %f jz: %f dist: %f", i, j, hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z, hyperbolicPoints[j].x, hyperbolicPoints[j].y, hyperbolicPoints[j].z, dist);
 					}
-
-					/*if (abs(FSum.x) < 0.002) FSum.x = 0;
-					if (abs(FSum.y) < 0.002) FSum.y = 0;
-					if (abs(FSum.z) < 0.002) FSum.z = 0;
-					*/
 				}
-
-				//printf("\ni : %d x: %f y: %f z: %f", i, FSum.x, FSum.y, FSum.z);
-
-				//printf("\n normalllt bef FSumx: %f, FSumy: %f, FSumz: %f ", FSum.x, FSum.y, FSum.z);
+				float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
+				float forceSize = origoForce(dist);
+				vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+				FSum = FSum + forceDirection * forceSize;
 
 				if (abs(FSum.x * dt) < 0.002) {
 					FSum.x = 0;
@@ -278,20 +255,9 @@ public:
 					FSum.z = 0;
 				}
 
-				
-				//printf("\n normalllt FSumx: %f, FSumy: %f, FSumz: %f ", FSum.x, FSum.y, FSum.z);
-				
-				
-				//printf("\n bvelocities vx: %f, vy: %f, vz: %f ", velocities[i].x, velocities[i].y, velocities[i].z);
 				// v = v + F * m, de m = 1
 				// v = v + F
 				velocities[i] = velocities[i] + FSum *dt;
-
-				//printf("\n velocities vx: %f, vy: %f, vz: %f ", velocities[i].x, velocities[i].y, velocities[i].z);
-				
-
-				//printf("i: %d f: %f\n ", i,  length(FSum));
-
 			}
 			// mozgatas es a sebessegvektor az uj pont erintosikjaba allitasa
 			for (int i = 0; i < numberOfPoints; i++)
@@ -315,20 +281,12 @@ public:
 				// viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
 				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2);
 				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
-				printf("\n motionDist %f ", motionDistance);
-				printf("\n point x: %f, y: %f, z: %f ", hyperbolicPoints[i].x, hyperbolicPoints[i].y, hyperbolicPoints[i].z);
-				printf("\n newPoint x: %f,vy: %f, z: %f ", hyperbolicPointsTemp.x, hyperbolicPointsTemp.y, hyperbolicPointsTemp.z);
-				printf("\n anOtherPointThatDirection vx: %f, vy: %f, vz: %f ", anOtherPointThatDirection.x, anOtherPointThatDirection.y, anOtherPointThatDirection.z);
-				
+			
 				hyperbolicPoints[i] = hyperbolicPointsTemp;
-				
 				vec3 newVelocityVector = normalize((anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection)));
-				printf("\n 1legyen: %f ", length(normalize(newVelocityVector)));
-				printf("\n newVelocityVector vx: %f, vy: %f, vz: %f ", newVelocityVector.x, newVelocityVector.y, newVelocityVector.z);
 				velocities[i] = length(velocities[i]) * newVelocityVector;
 			}
 			draw();
-
 		}
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
@@ -378,7 +336,7 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 	if (key == 32) {
 		graph.heuristicArrange();
 		graph.draw();
-		//graph.forceBasedArrange();
+		graph.forceBasedArrange();
 	}
 }
 
