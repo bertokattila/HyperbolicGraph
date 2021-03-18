@@ -139,7 +139,7 @@ public:
 			&hyperbolicPoints[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
 		glPointSize(10.0);
-		glDrawArrays(GL_POINTS, 0 /*startIdx*/, numberOfPoints /*# Elements*/);
+		//glDrawArrays(GL_POINTS, 0 /*startIdx*/, numberOfPoints /*# Elements*/);
 
 		hyperbolicEdgeCoordinates.clear();
 		for (int i = 0; i < numberOfEdges; i++)
@@ -155,14 +155,34 @@ public:
 			&hyperbolicEdgeCoordinates[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
+		
+		glUniform3f(colorLocation, 1, 1, 1); // mas szinuek legyenek
+		for (int i = 0; i < numberOfPoints; i++)
+		{
+			vec2 descartes = vec2(hyperbolicPoints[i].x, hyperbolicPoints[i].y);
+			vec2 circlePoints[20];
+			vec3 circlePointsHyperbolic[20];
+			for (int i = 0; i < 20; i++)
+			{
+				float angleRad = 2.0f * M_PI * i / 20;
+				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.03, sinf(angleRad) * 0.03);
+				circlePointsHyperbolic[i] = descartesToHyperbolic(circlePoints[i]);
+			}
+
+			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
+				sizeof(vec3) * 20,  // # bytes
+				circlePointsHyperbolic,	      	// address
+				GL_STATIC_DRAW);	// we do not change later
+			glDrawArrays(GL_TRIANGLE_FAN, 0 /*startIdx*/, 20 /*# Elements*/);
+		}
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
 	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
 		for (int i = 0; i < numberOfPoints; i++)	// graf pontjainak generalasa
 		{
 			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			float yCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float xCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float yCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
@@ -171,6 +191,12 @@ public:
 		float y = descartes.y;
 		float w = sqrt((x * x) + (y * y) + 1);
 		return vec3(x, y, w);
+	}
+	vec2 homogeneousDivision(vec3 hyperbolic) {
+		return vec2(hyperbolic.x / hyperbolic.z, hyperbolic.y / hyperbolic.z); //homogen koordinatabol descartes
+	}
+	vec3 homogeneousDivisionInverse(vec2 descartes, float w) {
+		return descartesToHyperbolic(vec2(descartes.x * w, descartes.y * w));
 	}
 	void heuristicArrange() {// k means
 		for (int i = 0; i < numberOfPoints; i++)
