@@ -70,9 +70,7 @@ class Graph {
 
 public:
 	vec2 points[numberOfPoints]; // graf pontjait tarolo lista
-
 	vec3 hyperbolicPoints[numberOfPoints];
-
 	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt
 		int a;
 		int b;
@@ -158,29 +156,21 @@ public:
 
 		int MVPLocation = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 		glUniformMatrix4fv(MVPLocation, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
-
 		glBindVertexArray(vao);  // Draw call
-
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(hyperbolicPoints),  // # bytes
 			&hyperbolicPoints[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
-
 		glPointSize(10.0);
 		glDrawArrays(GL_POINTS, 0 /*startIdx*/, numberOfPoints /*# Elements*/);
 
 		/// Innentol az elek rajzolasa
-
 		glUniform3f(colorLocation, 1, 0, 0); // mas szinuek legyenek
-
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(vec3) * hyperbolicEdgeCoordinates.size(),  // # bytes
 			&hyperbolicEdgeCoordinates[0],	      	// address
 			GL_STATIC_DRAW);	// we do not change later
-
-
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
-
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
 	void generateNewCoordinates(int seed, vec2 destinationArray[]) {
@@ -469,27 +459,24 @@ public:
 
 		}
 	}
+	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
+		float distance = hyperbolicDistance(mirrorPoint, pointToMirror); // a tavolsag a pont es m1 kozott
+		vec3 direction = (mirrorPoint - pointToMirror * coshf(distance)) / sinhf(distance); // az adott pontban ervenyes iranyvektor az m1 pont fele
+		vec3 mirroredPoint = pointToMirror * coshf(2 * distance) + direction * sinhf(2 * distance);
+		return mirroredPoint;
+	}
 	void move(vec3 hyperbolicMotionVector) {
 		float hyperbolicMotionVectorLength = hyperbolicDistance(hyperbolicMotionVector, vec3(0, 0, 1)); // az eltolas hossza
 		vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength)) / sinhf(hyperbolicMotionVectorLength); /// a hiperbola origojaban ervenyes iranyvektor
 
 		// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
 		vec3 m1 = vec3(0, 0, 1);
-		vec3 m2 = vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength * 0.50) + hyperbolicMotionVectorDirection * sinhf(hyperbolicMotionVectorLength * 0.50);
+		vec3 m2 = vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength * 0.5) + hyperbolicMotionVectorDirection * sinhf(hyperbolicMotionVectorLength * 0.5);
 
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			// pont tukrozese m1-re
-			float m1Distance = hyperbolicDistance(m1, hyperbolicPoints[i]); // a tavolsag a pont es m1 kozott
-			vec3 m1Direction = (m1 - hyperbolicPoints[i] * coshf(m1Distance)) / sinhf(m1Distance); // az adott pontban ervenyes iranyvektor az m1 pont fele
-			vec3 pointM1Mirror = hyperbolicPoints[i] * coshf(2 * m1Distance) + m1Direction * sinhf(2 * m1Distance);
-
-			// m1-re tukrozott pont tukrozese m2-re
-			float m2Distance = hyperbolicDistance(m2, pointM1Mirror);
-			vec3 m2Direction = (m2 - pointM1Mirror * coshf(m2Distance)) / sinhf(m2Distance);
-			vec3 pointM2Mirror = pointM1Mirror * coshf(2 * m2Distance) + m2Direction * sinhf(2 * m2Distance);
-
-			hyperbolicPoints[i] = pointM2Mirror; // az igy kapott pont lesz az uj pozicioja
+			vec3 firstMirrored = hyperbolicMirror(hyperbolicPoints[i], m1); // pont tukrozese m1-re
+			hyperbolicPoints[i] = hyperbolicMirror(firstMirrored, m2); // m1-re tukrozott pont tukrozese m2-re, az igy kapott pont lesz az uj pozicioja
 		}
 		refreshDescartesFromHyperbolic();
 		refreshEdgeCoordinates(hyperbolicPoints, edgeCoordinates, hyperbolicEdgeCoordinates);
@@ -501,21 +488,14 @@ Graph graph;
 
 // Initialization, create an OpenGL context
 void onInitialization() {
-
 	glViewport(0, 0, windowWidth, windowHeight);
-
 	graph.create();
-
 	// create program for the GPU
 	gpuProgram.create(vertexSource, fragmentSource, "outColor");
 }
 
 // Window has become invalid: Redraw
-void onDisplay() {
-	
-	graph.draw();
-	
-}
+void onDisplay() {graph.draw();}
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
@@ -541,12 +521,11 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 
 	motionEndCoordinates = vec2(cX, cY); 
 	vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
-	if (abs(descartesMotionVector.x) <= 0.0005 || abs(descartesMotionVector.y) <= 0.0005) {/// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
-		return;									///  ezert ilyen kis eltolast nem engedek meg
+	if (abs(descartesMotionVector.x) <= 0.0005 || abs(descartesMotionVector.y) <= 0.0005) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+		return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
  	}
 	graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
 	motionStartCoordinates = motionEndCoordinates; // a kovetkezo lefutasnal a mar megtortent eltolast ne csinalja meg ujra
-
 }
 
 // Mouse click event
@@ -559,20 +538,6 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 		motionStartCoordinates = vec2(cX, cY);
 		printf("\nklikk %f %f", cX, cY);
 	}
-
-
-	/*char* buttonStat;
-	switch (state) {
-	case GLUT_DOWN: buttonStat = "pressed"; break;
-	case GLUT_UP:   buttonStat = "released"; break;
-	}
-
-	switch (button) {
-	case GLUT_LEFT_BUTTON:   printf("Left button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);   break;
-	case GLUT_MIDDLE_BUTTON: printf("Middle button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY); break;
-	case GLUT_RIGHT_BUTTON:  printf("Right button %s at (%3.2f, %3.2f)\n", buttonStat, cX, cY);  break;
-	}
-	*/
 }
 
 // Idle event indicating that some time elapsed: do animation here
