@@ -158,13 +158,11 @@ public:
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
 	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
-		srand(seed);
-		// graf pontjainak generalasa
-		for (int i = 0; i < numberOfPoints; i++)
+		for (int i = 0; i < numberOfPoints; i++)	// graf pontjainak generalasa
 		{
 			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			float yCoordinate = 2 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float xCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float yCoordinate = 5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
@@ -265,15 +263,7 @@ public:
 				float motionDistance = length(velocities[i]) * dt;
 				if (abs(motionDistance) < 0.05) { continue;  }
 				vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
-				if (abs(hyperbolicPointsTemp.x) < 0.002) {
-					hyperbolicPointsTemp.x = 0;
-				}
-				if (abs(hyperbolicPointsTemp.y) < 0.002) {
-					hyperbolicPointsTemp.y = 0;
-				}
-				if (abs(hyperbolicPointsTemp.z) < 0.002) {
-					hyperbolicPointsTemp.z = 0;
-				}
+
 				//printf("\ni : %d x: %f y: %f z: %f", i, hyperbolicPointsTemp.x, hyperbolicPointsTemp.y, hyperbolicPointsTemp.z);
 			
 				// viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
@@ -340,19 +330,22 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 }
 
 vec2 motionStartCoordinates, motionEndCoordinates;
+bool rightClicked = false;
 // Move mouse with key pressed
 void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
-	float cY = 1.0f - 2.0f * pY / windowHeight;
+	if (rightClicked) {
+		// Convert to normalized device space
+		float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+		float cY = 1.0f - 2.0f * pY / windowHeight;
 
-	motionEndCoordinates = vec2(cX, cY); 
-	vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
-	if (abs(descartesMotionVector.x) <= 0.0005 || abs(descartesMotionVector.y) <= 0.0005) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
-		return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
- 	}
-	graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
-	motionStartCoordinates = motionEndCoordinates; // a kovetkezo lefutasnal a mar megtortent eltolast ne csinalja meg ujra
+		motionEndCoordinates = vec2(cX, cY);
+		vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
+		if (abs(descartesMotionVector.x) <= FLT_MIN || abs(descartesMotionVector.y) <= FLT_MIN) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+			return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
+		}
+		graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
+		motionStartCoordinates = motionEndCoordinates; // a kovetkezo lefutasnal a mar megtortent eltolast ne csinalja meg ujra
+	}
 }
 
 // Mouse click event
@@ -361,9 +354,13 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 
-	if (button == GLUT_LEFT_BUTTON) {
+	if (button == GLUT_RIGHT_BUTTON) {
 		motionStartCoordinates = vec2(cX, cY);
+		rightClicked = true;
 		printf("\nklikk %f %f", cX, cY);
+	}
+	else {
+		rightClicked = false;
 	}
 }
 
