@@ -40,8 +40,12 @@ const char* const vertexSource = R"(
 
 	uniform mat4 MVP;			// uniform variable, the Model-View-Projection transformation matrix
 	layout(location = 0) in vec3 vp;	// Varying input: vp = vertex position is expected in attrib array 0
+	layout(location = 1) in vec2 vertexUV;			// Attrib Array 1
+
+	out vec2 texCoord;								// output attribute
 
 	void main() {
+		texCoord = vertexUV; // tovabbadom
 		gl_Position = vec4(vp.x/vp.z, vp.y/vp.z, 0, 1) * MVP;		// transform vp from modeling space to normalized device space
 	}
 )";
@@ -50,12 +54,21 @@ const char* const vertexSource = R"(
 const char* const fragmentSource = R"(
 	#version 330			// Shader 3.3
 	precision highp float;	// normal floats, makes no difference on desktop computers
+
+	uniform sampler2D textureUnit;
+	uniform int useTexture; // megadja, hogy textura szinet kell hasznalni vagy a color valtozot
 	
 	uniform vec3 color;		// uniform variable, the color of the primitive
-	out vec4 outColor;		// computed color of the current pixel
+
+	in vec2 texCoord;
+	out vec4 fragmentColor;		// computed color of the current pixel
 
 	void main() {
-		outColor = vec4(color, 1);	// computed color is the color of the primitive
+		if (useTexture == 0){	
+			fragmentColor = vec4(color, 1);	// computed color is the color of the primitive
+		} else {
+			fragmentColor = texture(textureUnit, texCoord);
+		}
 	}
 )";
 
@@ -106,25 +119,48 @@ public:
 		glGenVertexArrays(1, &vao);	// get 1 vao id
 		glBindVertexArray(vao);		// make it active
 
-		unsigned int vbo;		// vertex buffer object
-		glGenBuffers(1, &vbo);	// Generate 1 buffer
-		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		unsigned int vbo[2];		// az 0-as vbo lesz a pontoke, az 1-es pedig a textura pozicioke
+		glGenBuffers(2, vbo);	// Generate 2 buffer
 
+	
+		/*for (int i = 0; i < 20; i++)
+		{
+			float angleRad = 2.0f * M_PI * i / 20;
+			uvs[i] = vec2(0.5, 0.5) + vec2(cosf(angleRad) * 0.5, sinf(angleRad) * 0.5);
+			printf("x: %f y: %f\n", uvs[i].x, uvs[i].y);
+		}*/
+
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
 		glEnableVertexAttribArray(0);  // AttribArray 0
 		glVertexAttribPointer(0,       // vbo -> AttribArray 0
 			3, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
 			0, NULL); 		     // stride, offset: tightly packed
 
-		// create program for the GPU
-		gpuProgram.create(vertexSource, fragmentSource, "outColor");
+
+		vec2 uvs[4];
+		uvs[0] = vec2(0, 0);
+		uvs[1] = vec2(1, 0);
+		uvs[2] = vec2(1, 1);
+		uvs[3] = vec2(0, 1);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(uvs), uvs, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(1);  // AttribArray 0
+		glVertexAttribPointer(1,       // vbo -> AttribArray 0
+			2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
+			0, NULL); 		     // stride, offset: tightly packed
+
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+
+		
 	}
 	void draw() {
 		glClearColor(0, 0, 0, 0);     // background color
-		glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer\
+		glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
 
-		// Set color to (0, 1, 0) = green
 		int colorLocation = glGetUniformLocation(gpuProgram.getId(), "color");
 		glUniform3f(colorLocation, 0, 1, 0); // 3 floats
+		gpuProgram.setUniform(false, "useTexture");
 
 		float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
 								  0, 1, 0, 0,    // row-major!
@@ -137,7 +173,7 @@ public:
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(hyperbolicPoints),  // # bytes
 			&hyperbolicPoints[0],	      	// address
-			GL_STATIC_DRAW);	// we do not change later
+			GL_DYNAMIC_DRAW);	// we do not change later
 		glPointSize(10.0);
 		//glDrawArrays(GL_POINTS, 0 /*startIdx*/, numberOfPoints /*# Elements*/);
 
@@ -153,9 +189,11 @@ public:
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(vec3) * hyperbolicEdgeCoordinates.size(),  // # bytes
 			&hyperbolicEdgeCoordinates[0],	      	// address
-			GL_STATIC_DRAW);	// we do not change later
+			GL_DYNAMIC_DRAW);	// we do not change later
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
 		
+		// Innentol a korok rajzolasa
+		gpuProgram.setUniform(false, "useTexture");
 		glUniform3f(colorLocation, 1, 1, 1); // mas szinuek legyenek
 		for (int i = 0; i < numberOfPoints; i++)
 		{
@@ -172,9 +210,40 @@ public:
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(vec3) * 20,  // # bytes
 				circlePointsHyperbolic,	      	// address
-				GL_STATIC_DRAW);	// we do not change later
+				GL_DYNAMIC_DRAW);	// we do not change later
 			glDrawArrays(GL_TRIANGLE_FAN, 0 /*startIdx*/, 20 /*# Elements*/);
 		}
+
+
+		//---------------------------------------
+
+		int width = 128, height = 128;				// create checkerboard texture procedurally
+		std::vector<vec4> image(width * height);
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				image[y * width + x] = vec4(1, 0, 0, 1);
+			}
+		}
+
+		Texture texture(width, height, image);
+		gpuProgram.setUniform(texture, "textureUnit");
+
+
+		vec3 testSquare[4];
+		testSquare[0] = vec3(-0.5, -0.5, 1);
+		testSquare[1] = vec3(0.5, -0.5, 1);
+		testSquare[2] = vec3(0.5, 0.5, 1);
+		testSquare[3] = vec3(-0.5, 0.5, 1);
+
+		gpuProgram.setUniform(true, "useTexture");
+
+		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
+			sizeof(testSquare),  // # bytes
+			testSquare,	      	// address
+			GL_STATIC_DRAW);	// we do not change later
+		glDrawArrays(GL_TRIANGLE_FAN, 0 /*startIdx*/, 4 /*# Elements*/);
+
+
 		glutSwapBuffers(); // exchange buffers for double buffering
 	}
 	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
@@ -331,9 +400,15 @@ Graph graph;
 // Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
+
+	
+
+	
+
+	gpuProgram.create(vertexSource, fragmentSource, "fragmentColor");
 	graph.create();
 	// create program for the GPU
-	gpuProgram.create(vertexSource, fragmentSource, "outColor");
+	
 }
 
 // Window has become invalid: Redraw
