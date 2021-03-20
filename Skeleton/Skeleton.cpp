@@ -33,7 +33,7 @@
 //=============================================================================================
 #include "framework.h"
 
-// vertex shader in GLSL: It is a Raw string (C++11) since it contains new line characters
+// vertex shader
 const char* const vertexSource = R"(
 	#version 330									// Shader 3.3
 	precision highp float;							// normal floats, makes no difference on desktop computers
@@ -48,16 +48,14 @@ const char* const vertexSource = R"(
 	}
 )";
 
-// fragment shader in GLSL
+// fragment shader
 const char* const fragmentSource = R"(
 	#version 330									// Shader 3.3
 	precision highp float;							// normal floats, makes no difference on desktop computers
 
 	uniform sampler2D textureUnit;					// texturazo egyseg
 	uniform int useTexture;							// megadja, hogy a texturat kell hasznalni vagy a color valtozot
-	
 	uniform vec3 color;								// uniform variable, the color of the primitive
-
 	in vec2 texCoord;
 	out vec4 fragmentColor;							// computed color of the current pixel
 
@@ -78,7 +76,8 @@ const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) *
 
 class Graph {
 public:
-	vec3 hyperbolicPoints[numberOfPoints]; /// a pontok (homogen) koordinatai
+	vec3 hyperbolicPoints[numberOfPoints]; /// a pontok (csucsok) koordinatai
+	vec4 colors[numberOfPoints];
 	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt
 		int a;
 		int b;
@@ -92,11 +91,10 @@ public:
 
 	void create() {
 		generateNewCoordinates(1, hyperbolicPoints);
-
+		generateNewColors(colors);
 		image.resize(width * height);
 
-		// graf eleinek generalasa
-		for (int i = 0; i < numberOfEdges; i++)
+		for (int i = 0; i < numberOfEdges; i++)	// graf eleinek generalasa
 		{
 			bool edgeAlreadyExists = true;
 			int a;
@@ -106,7 +104,7 @@ public:
 				a = rand() % numberOfPoints; // Random parok generalasa 0 es 49 koze
 				b = rand() % numberOfPoints;
 				if (a == b) continue;
-				edgeAlreadyExists = false;// le kell ellenorizni, hogy letezik-e mar az el, i db mar letezo el van, ezert addig kell futnia a ciklusnak
+				edgeAlreadyExists = false; // le kell ellenorizni, hogy letezik-e mar az el, i db mar letezo el van, ezert addig kell futnia a ciklusnak
 				for (int j = 0; j < i; j++)
 				{
 					if (edges[i].a == a && edges[i].b == b || edges[i].a == b && edges[i].b == a) {
@@ -146,8 +144,6 @@ public:
 			0, NULL); 		     // stride, offset: tightly packed
 
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-
-		
 	}
 	void draw() {
 		glClearColor(0, 0, 0, 0);     // background color
@@ -184,21 +180,26 @@ public:
 		/////////////////////////////////////// Innentol a korok rajzolasa ///////////////////////////////////////
 		gpuProgram.setUniform(true, "useTexture");
 
-	
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			float aParam = (float)(i % numberOfPoints) / (float)numberOfPoints;
-			float bParam = 1 - ((float)(i % numberOfPoints) / (float)numberOfPoints);
+			vec4 color1 = colors[i];
+			vec4 color2 = vec4(colors[i].z, colors[i].x, colors[i].y, 1);
+			vec4 color3 = vec4(colors[i].y, colors[i].z, colors[i].x, 1);
+			vec4 color4 = vec4(1 - colors[i].x,1 - colors[i].y, 1 - colors[i].z, 1);
 
 			for (int y = 0; y < height; y++) {
-				for (int x = 0; x < width; x++) { /// egyedi szinekbol allo teztura generalasa mindegyik korre
-
-					if (x > 32) {
-						
-						image[y * width + x] = vec4(0, aParam, bParam, 1);
+				for (int x = 0; x < width; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
+					if (x > 32 && y > 32) {
+						image[y * width + x] = color1;
 					}
-					else {
-						image[y * width + x] = vec4(bParam, 0, aParam, 1);
+					else if(x > 32 && y < 32) {
+						image[y * width + x] = color2;
+					}
+					else if (x < 32 && y > 32) {
+						image[y * width + x] = color3;
+					}
+					else if (x < 32 && y < 32) {
+						image[y * width + x] = color4;
 					}
 				}
 			}
@@ -230,17 +231,34 @@ public:
 			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
+	void generateNewColors(vec4 destinationArray[]) {
+		for (int i = 0; i < numberOfPoints; i++)
+		{
+			float epsilon = 0.001;
+			float r, g, b;
+			bool match = true;
+			while (match)
+			{
+				r = (float)rand() / (float)RAND_MAX;
+				g = (float)rand() / (float)RAND_MAX;
+				b = (float)rand() / (float)RAND_MAX;
+				match = false;
+				for (int j = 0; j < i; j++)
+				{
+					if (fabs(r - colors[j].x) < epsilon && fabs(g - colors[j].y) < epsilon && fabs(b - colors[j].z) < epsilon) {
+						match = true;
+						break;
+					}
+				}
+			}
+			colors[i] = vec4(r, g, b, 1);
+		}
+	}
 	vec3 descartesToHyperbolic(vec2 descartes) {
 		float x = descartes.x;
 		float y = descartes.y;
 		float w = sqrt((x * x) + (y * y) + 1);
 		return vec3(x, y, w);
-	}
-	vec2 homogeneousDivision(vec3 hyperbolic) {
-		return vec2(hyperbolic.x / hyperbolic.z, hyperbolic.y / hyperbolic.z); //homogen koordinatabol descartes
-	}
-	vec3 homogeneousDivisionInverse(vec2 descartes, float w) {
-		return descartesToHyperbolic(vec2(descartes.x * w, descartes.y * w));
 	}
 	void heuristicArrange() {// k means
 		for (int i = 0; i < numberOfPoints; i++)
@@ -293,17 +311,13 @@ public:
 				{
 					if (i == j) continue;
 					float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
-
 					if (areNeighbours(i, j)) {
 						float forceSize = pairForce(dist);
 						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-						//printf("lorentz: %f\n", lorentz(forceDirection, hyperbolicPoints[i]));
-						// printf("pairforce: %f dist: %f\n", forceSize, dist);
 						FSum = FSum + forceDirection * forceSize;
 						}
 					else {
 						float forceSize = notPairForce(dist);
-						//printf("notpairforce: %f dist: %f\n",forceSize, dist);
 						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
 						FSum = FSum + forceDirection * forceSize;
 					}
@@ -322,22 +336,18 @@ public:
 				if (abs(FSum.z * dt) < 0.002) {
 					FSum.z = 0;
 				}
-				// v = v + F * m, de m = 1
-				velocities[i] = velocities[i] + FSum *dt;
+				velocities[i] = velocities[i] + FSum * dt; // v = v + F * m, de m = 1
 			}
-			// mozgatas es a sebessegvektor az uj pont erintosikjaba allitasa
-			for (int i = 0; i < numberOfPoints; i++)
-			{
-				//printf("\n%d\n", i);
-				// v * t = s
-				float motionDistance = length(velocities[i]) * dt;
+			
+			for (int i = 0; i < numberOfPoints; i++) // mozgatas es a sebessegvektor az uj pont erintosikjaba allitasa
+			{	
+				
+				float motionDistance = length(velocities[i]) * dt; // v * t = s
 				if (abs(motionDistance) < 0.05) { continue;  }
 				vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
 
-				//printf("\ni : %d x: %f y: %f z: %f", i, hyperbolicPointsTemp.x, hyperbolicPointsTemp.y, hyperbolicPointsTemp.z);
-			
-				// viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
-				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2);
+				
+				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
 				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
 			
 				hyperbolicPoints[i] = hyperbolicPointsTemp;
@@ -355,7 +365,7 @@ public:
 	}
 	void move(vec3 hyperbolicMotionVector) {
 		float hyperbolicMotionVectorLength = hyperbolicDistance(hyperbolicMotionVector, vec3(0, 0, 1)); // az eltolas hossza
-		vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength)) / sinhf(hyperbolicMotionVectorLength); /// a hiperbola origojaban ervenyes iranyvektor
+		vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength)) / sinhf(hyperbolicMotionVectorLength); /// a hiperbolpid "origojaban" ervenyes iranyvektor
 
 		// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
 		vec3 m1 = vec3(0, 0, 1);
@@ -377,8 +387,6 @@ void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	gpuProgram.create(vertexSource, fragmentSource, "fragmentColor");
 	graph.create();
-	// create program for the GPU
-	
 }
 
 // Window has become invalid: Redraw
