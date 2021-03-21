@@ -280,9 +280,10 @@ public:
 		}
 	}
 	bool areNeighbours(int i, int j) {
-		for each (PointPair pair in edges)
+
+		for (int i = 0; i < numberOfPoints; i++)
 		{
-			if (pair.a == i && pair.b == j || pair.a == j && pair.b == i) return true;
+			if (edges[i].a == i && edges[i].b == j || edges[i].a == j && edges[i].b == i) return true;
 		}
 		return false;
 	}
@@ -296,14 +297,13 @@ public:
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
 	void forceBasedArrange() { // minden pont tomege 1
 		vec3 velocities[numberOfPoints];
-		for each (vec3 v in velocities) // sebessegvektorok kinullazasa
+		for (int i = 0; i < numberOfPoints; i++)
 		{
-			v.x = 0; v.y = 0; v.z = 0;
+			velocities[i].x = 0; velocities[i].y = 0; velocities[i].z = 0;
 		}
 		float dt = 0.03;
 		for (float t = 0; t < 1; t += dt) /// ido halad elore
 		{
-			//printf("\n\nt: %f\n\n ", t);
 			for (int i = 0; i < numberOfPoints; i++)
 			{
 				vec3 FSum = vec3(0, 0, 0);
@@ -369,7 +369,7 @@ public:
 
 		// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
 		vec3 m1 = vec3(0, 0, 1);
-		vec3 m2 = vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength * 0.5) + hyperbolicMotionVectorDirection * sinhf(hyperbolicMotionVectorLength * 0.5);
+		vec3 m2 = vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength / 2) + hyperbolicMotionVectorDirection * sinhf(hyperbolicMotionVectorLength / 2);
 
 		for (int i = 0; i < numberOfPoints; i++)
 		{
@@ -419,7 +419,7 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 
 		motionEndCoordinates = vec2(cX, cY);
 		vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
-		if (abs(descartesMotionVector.x) <= FLT_MIN || abs(descartesMotionVector.y) <= FLT_MIN) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+		if (abs(descartesMotionVector.x) <= 0.001 || abs(descartesMotionVector.y) <= 0.001) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
 			return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
 		}
 		graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
@@ -436,7 +436,6 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	if (button == GLUT_RIGHT_BUTTON) {
 		motionStartCoordinates = vec2(cX, cY);
 		rightClicked = true;
-		printf("\nklikk %f %f", cX, cY);
 	}
 	else {
 		rightClicked = false;
