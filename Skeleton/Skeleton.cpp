@@ -73,6 +73,7 @@ unsigned int vao;	   // virtual world on the GPU
 
 const int numberOfPoints = 50;
 const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) * 0.05
+bool doForceBasedArrange = false; // az onIdle figyeli, hogy mikor kell futnia az erovezere
 
 class Graph {
 public:
@@ -88,6 +89,7 @@ public:
 
 	int width = 64, height = 64;
 	std::vector<vec4> image; // proceduralisan eloallitott textura-kep
+	vec3 velocities[numberOfPoints];
 
 	void create() {
 		generateNewCoordinates(1, hyperbolicPoints);
@@ -213,7 +215,9 @@ public:
 				float angleRad = 2.0f * M_PI * i / 20;
 				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.05, sinf(angleRad) * 0.05);
 				circlePointsHyperbolic[i] = descartesToHyperbolic(circlePoints[i]);
+				
 			}
+			
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(vec3) * 20,  // # bytes
 				circlePointsHyperbolic,	      	// address
@@ -280,30 +284,31 @@ public:
 		}
 	}
 	bool areNeighbours(int i, int j) {
-
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			if (edges[i].a == i && edges[i].b == j || edges[i].a == j && edges[i].b == i) return true;
 		}
 		return false;
 	}
+
+
 	float pairForce(float distance) {
-		float optimalDistance = 0.2;
-		return 0.5 * ((distance - 1) * (distance - 1) * (distance - 1));
+		float optimalDistance = 0.25;
+		return 0.3 * (distance-optimalDistance);
 	}
-	float notPairForce(float distance){return 0.02 + 0.07 / (-1 * (sqrt(distance + 0.1) * (sqrt(distance + 0.1))));}
-	float origoForce(float distance) { return 0.1 * distance * distance * distance; }
+	float notPairForce(float distance){return  0.02 + 0.07 / (-1 * (sqrt(distance + 0.1) * (sqrt(distance + 0.1))));}
+	float origoForce(float distance) { return 0.05 * distance * distance * distance; }
+
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
-	void forceBasedArrange() { // minden pont tomege 1
-		vec3 velocities[numberOfPoints];
+	void invokeForceBasedArrange() {
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			velocities[i].x = 0; velocities[i].y = 0; velocities[i].z = 0;
 		}
-		float dt = 0.03;
-		for (float t = 0; t < 1; t += dt) /// ido halad elore
-		{
+		doForceBasedArrange = true;
+	}
+	void forceBasedArrange(float dt) { // minden pont tomege 1
 			for (int i = 0; i < numberOfPoints; i++)
 			{
 				vec3 FSum = vec3(0, 0, 0);
@@ -314,7 +319,7 @@ public:
 					if (areNeighbours(i, j)) {
 						float forceSize = pairForce(dist);
 						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-						FSum = FSum + forceDirection * forceSize;
+						FSum = FSum + forceDirection *20* forceSize;
 						}
 					else {
 						float forceSize = notPairForce(dist);
@@ -327,35 +332,24 @@ public:
 				vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
 				FSum = FSum + forceDirection * forceSize;
 
-				if (abs(FSum.x * dt) < 0.002) {
-					FSum.x = 0;
-				}
-				if (abs(FSum.y * dt) < 0.002) {
-					FSum.y = 0;
-				}
-				if (abs(FSum.z * dt) < 0.002) {
-					FSum.z = 0;
-				}
+
 				velocities[i] = velocities[i] + FSum * dt; // v = v + F * m, de m = 1
-			}
-			
-			for (int i = 0; i < numberOfPoints; i++) // mozgatas es a sebessegvektor az uj pont erintosikjaba allitasa
-			{	
-				
+
 				float motionDistance = length(velocities[i]) * dt; // v * t = s
-				if (abs(motionDistance) < 0.05) { continue;  }
+				//if (abs(motionDistance) < 0.05) { continue; }
 				vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
 
-				
+
 				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
 				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
-			
+
 				hyperbolicPoints[i] = hyperbolicPointsTemp;
 				vec3 newVelocityVector = normalize((anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection)));
 				velocities[i] = length(velocities[i]) * newVelocityVector;
 			}
+
 			draw();
-		}
+		
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
 		float distance = hyperbolicDistance(mirrorPoint, pointToMirror); // a tavolsag a pont es m1 kozott
@@ -402,9 +396,8 @@ void onKeyboardUp(unsigned char key, int pX, int pY) {
 	printf("Pressed: %d", key); // 32 a space
 	if (key == 32) {
 		graph.heuristicArrange();
-		
+		graph.invokeForceBasedArrange();
 		graph.draw();
-		graph.forceBasedArrange();
 	}
 }
 
@@ -432,7 +425,6 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	// Convert to normalized device space
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
 	float cY = 1.0f - 2.0f * pY / windowHeight;
-
 	if (button == GLUT_RIGHT_BUTTON) {
 		motionStartCoordinates = vec2(cX, cY);
 		rightClicked = true;
@@ -442,8 +434,13 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 	}
 }
 
-// Idle event indicating that some time elapsed: do animation here
 void onIdle() {
-	graph.draw();
-	long time = glutGet(GLUT_ELAPSED_TIME); // elapsed time since the start of the program
+	if (doForceBasedArrange) {
+		float dt = 0.03;
+		for (float t = 0; t < 1; t += dt) /// ido halad elore
+		{
+ 			graph.forceBasedArrange(dt);
+		}
+		doForceBasedArrange = false;
+	}
 }
