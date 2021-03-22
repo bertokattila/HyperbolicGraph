@@ -95,6 +95,7 @@ public:
 		generateNewCoordinates(1, hyperbolicPoints);
 		generateNewColors(colors);
 		image.resize(width * height);
+		srand(1);
 
 		for (int i = 0; i < numberOfEdges; i++)	// graf eleinek generalasa
 		{
@@ -299,19 +300,17 @@ public:
 		float force = 1 * log10f(distance / 0.5);
 		//float force = pow((distance - 0.2), 3) * 200;
 		if (force < -0.5) force = -0.5;
-		return force;
+		return 4 * force;
 	}
 	float notPairForce(float distance) {
 		float force = -0.2 / pow(distance, 2);
-		//float force = log(distance) - 1;
-		if (force < -0.5) force = -0.5;
+	if (force < -0.5) force = -0.5;
 		return 1 * force;
 	}
 	float origoForce(float distance) {
-		//float force = 10 * pow(5, distance - 3);
-		float force = distance * 10;
-		//if (force < -0.5) return -0.5;
-		return 1 * force;
+		
+		float force = distance * 3;
+		return 0.8 * force;
 	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
@@ -346,10 +345,10 @@ public:
 			float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
 			float forceSize = origoForce(dist);
 			vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-			FSum = FSum + forceDirection * forceSize - length(velocities[i]) * velocities[i]; // origo korul tartas es surlodas
+			FSum = FSum + forceDirection * forceSize - 8 * pow(length(velocities[i]), 2) * velocities[i]; // origo korul tartas es surlodas
 			//FSum = FSum + Fo(hyperbolicPoints[i]);
 
-			velocities[i] = (velocities[i] + FSum * dt); // v = v + F * m, de m = 1
+			velocities[i] = (velocities[i] + FSum * dt) - 0.1 * velocities[i]; // v = v + F * m, de m = 1
 
 		}
 		for (int i = 0; i < numberOfPoints; i++) // a csucsok egyszerre mozgatasa
@@ -365,11 +364,11 @@ public:
 			hyperbolicPoints[i] = hyperbolicPointsTemp;
 			vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * coshf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinhf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
 
-			printf("lorentz %f\n", length(newVelocityVector));
+
 
 			velocities[i] = length(velocities[i]) * newVelocityVector;
 		}
-		draw();
+		//draw();
 
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
@@ -392,7 +391,7 @@ public:
 			vec3 firstMirrored = hyperbolicMirror(hyperbolicPoints[i], m1); // pont tukrozese m1-re
 			hyperbolicPoints[i] = hyperbolicMirror(firstMirrored, m2); // m1-re tukrozott pont tukrozese m2-re, az igy kapott pont lesz az uj pozicioja
 		}
-		draw();
+		
 	}
 };
 
@@ -458,11 +457,20 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 
 void onIdle() {
 	if (doForceBasedArrange) {
-		float dt = 0.01;
-		for (float t = 0; t < 1; t += dt) /// ido halad elore
+		float dt = 0.03;
+		int drawEveryNthPicture = 70;
+		int picture = 0;
+		for (float t = 0; t < 15; t += dt) /// ido halad elore
 		{
 			graph.forceBasedArrange(dt);
+			picture++;
+			if (picture % drawEveryNthPicture == 0) {
+				graph.draw();
+				//drawEveryNthPicture += 70;
+			}
 		}
-		//doForceBasedArrange = false;
+		
+		doForceBasedArrange = false;
 	}
+	graph.draw();
 }
