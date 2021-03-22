@@ -178,23 +178,24 @@ public:
 			&hyperbolicEdgeCoordinates[0],	      	// address
 			GL_DYNAMIC_DRAW);	// we do not change later
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
-		
+
 		/////////////////////////////////////// Innentol a korok rajzolasa ///////////////////////////////////////
 		gpuProgram.setUniform(true, "useTexture");
+		glUniform3f(colorLocation, 1, 0, 0); // 3 floats
 
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec4 color1 = colors[i];
 			vec4 color2 = vec4(colors[i].z, colors[i].x, colors[i].y, 1);
 			vec4 color3 = vec4(colors[i].y, colors[i].z, colors[i].x, 1);
-			vec4 color4 = vec4(1 - colors[i].x,1 - colors[i].y, 1 - colors[i].z, 1);
+			vec4 color4 = vec4(1 - colors[i].x, 1 - colors[i].y, 1 - colors[i].z, 1);
 
 			for (int y = 0; y < height; y++) {
 				for (int x = 0; x < width; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
 					if (x > 32 && y > 32) {
 						image[y * width + x] = color1;
 					}
-					else if(x > 32 && y < 32) {
+					else if (x > 32 && y < 32) {
 						image[y * width + x] = color2;
 					}
 					else if (x < 32 && y > 32) {
@@ -208,6 +209,8 @@ public:
 			Texture texture(width, height, image);
 			gpuProgram.setUniform(texture, "textureUnit");
 			vec2 descartes = vec2(hyperbolicPoints[i].x, hyperbolicPoints[i].y);
+			float w = hyperbolicPoints[i].z;
+			vec2 descartesXYvetulet = vec2(hyperbolicPoints[i].x / w, hyperbolicPoints[i].y / w);
 			vec2 circlePoints[20];
 			vec3 circlePointsHyperbolic[20];
 			for (int i = 0; i < 20; i++)
@@ -215,9 +218,8 @@ public:
 				float angleRad = 2.0f * M_PI * i / 20;
 				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.05, sinf(angleRad) * 0.05);
 				circlePointsHyperbolic[i] = descartesToHyperbolic(circlePoints[i]);
-				
 			}
-			
+
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(vec3) * 20,  // # bytes
 				circlePointsHyperbolic,	      	// address
@@ -232,7 +234,7 @@ public:
 			// Random koordinatak generalasa -1 es 1 koze
 			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			float yCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
-			destinationArray[i] =  descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
+			destinationArray[i] = descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
 	void generateNewColors(vec4 destinationArray[]) {
@@ -267,38 +269,50 @@ public:
 	void heuristicArrange() {// k means
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			vec2 sum = vec2(0,0);
+			vec2 sum = vec2(0, 0);
+			int weight = 0;
 			for (int j = 0; j < numberOfPoints; j++)
 			{
 				if (i == j) continue; /// sajat maga nem szamit
 				if (areNeighbours(i, j)) {
+					weight++;
 					sum = sum + vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 				else
 				{
+					weight--;
 					sum = sum - vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 			}
-			sum = sum / (numberOfPoints - 1);
+			sum = sum / weight;
 			hyperbolicPoints[i] = descartesToHyperbolic(sum);
 		}
 	}
 	bool areNeighbours(int i, int j) {
-		for (int i = 0; i < numberOfPoints; i++)
+		for (int k = 0; k < numberOfPoints; k++)
 		{
-			if (edges[i].a == i && edges[i].b == j || edges[i].a == j && edges[i].b == i) return true;
+			if (edges[k].a == i && edges[k].b == j || edges[k].a == j && edges[k].b == i) return true;
 		}
 		return false;
 	}
-
-
 	float pairForce(float distance) {
-		float optimalDistance = 0.25;
-		return 0.3 * (distance-optimalDistance);
+		float force = 1 * log10f(distance / 0.5);
+		//float force = pow((distance - 0.2), 3) * 200;
+		if (force < -0.5) force = -0.5;
+		return force;
 	}
-	float notPairForce(float distance){return  0.02 + 0.07 / (-1 * (sqrt(distance + 0.1) * (sqrt(distance + 0.1))));}
-	float origoForce(float distance) { return 0.05 * distance * distance * distance; }
-
+	float notPairForce(float distance) {
+		float force = -0.2 / pow(distance, 2);
+		//float force = log(distance) - 1;
+		if (force < -0.5) force = -0.5;
+		return 1 * force;
+	}
+	float origoForce(float distance) {
+		//float force = 10 * pow(5, distance - 3);
+		float force = distance * 10;
+		//if (force < -0.5) return -0.5;
+		return 1 * force;
+	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
 	void invokeForceBasedArrange() {
@@ -309,47 +323,54 @@ public:
 		doForceBasedArrange = true;
 	}
 	void forceBasedArrange(float dt) { // minden pont tomege 1
-			for (int i = 0; i < numberOfPoints; i++)
+		for (int i = 0; i < numberOfPoints; i++)
+		{
+			vec3 FSum = vec3(0, 0, 0);
+			for (int j = 0; j < numberOfPoints; j++)
 			{
-				vec3 FSum = vec3(0, 0, 0);
-				for (int j = 0; j < numberOfPoints; j++)
-				{
-					if (i == j) continue;
-					float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
-					if (areNeighbours(i, j)) {
-						float forceSize = pairForce(dist);
-						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-						FSum = FSum + forceDirection *20* forceSize;
-						}
-					else {
-						float forceSize = notPairForce(dist);
-						vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-						FSum = FSum + forceDirection * forceSize;
-					}
+				if (i == j) continue;
+				float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
+				if (areNeighbours(i, j)) {
+					float forceSize = pairForce(dist);
+					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+					FSum = FSum + forceDirection * forceSize;
+					//FSum = FSum + Fe(hyperbolicPoints[i], hyperbolicPoints[j]);
 				}
-				float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
-				float forceSize = origoForce(dist);
-				vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-				FSum = FSum + forceDirection * forceSize;
-
-
-				velocities[i] = velocities[i] + FSum * dt; // v = v + F * m, de m = 1
-
-				float motionDistance = length(velocities[i]) * dt; // v * t = s
-				//if (abs(motionDistance) < 0.05) { continue; }
-				vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * cosh(motionDistance) + normalize(velocities[i]) * sinh(motionDistance);
-
-
-				vec3 anOtherPointThatDirection = hyperbolicPoints[i] * cosh(motionDistance + 2) + normalize(velocities[i]) * sinh(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
-				// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
-
-				hyperbolicPoints[i] = hyperbolicPointsTemp;
-				vec3 newVelocityVector = normalize((anOtherPointThatDirection - hyperbolicPoints[i] * cosh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinh(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection)));
-				velocities[i] = length(velocities[i]) * newVelocityVector;
+				else {
+					float forceSize = notPairForce(dist);
+					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+					FSum = FSum + forceDirection * forceSize;
+					//FSum = FSum + Fn(hyperbolicPoints[i], hyperbolicPoints[j]);
+				}
 			}
+			float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
+			float forceSize = origoForce(dist);
+			vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+			FSum = FSum + forceDirection * forceSize - length(velocities[i]) * velocities[i]; // origo korul tartas es surlodas
+			//FSum = FSum + Fo(hyperbolicPoints[i]);
 
-			draw();
-		
+			velocities[i] = (velocities[i] + FSum * dt); // v = v + F * m, de m = 1
+
+		}
+		for (int i = 0; i < numberOfPoints; i++) // a csucsok egyszerre mozgatasa
+		{
+			float motionDistance = length(velocities[i]) * dt; // v * t = s
+			//if (abs(motionDistance) < 0.005) { continue; }
+			vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * coshf(motionDistance) + normalize(velocities[i]) * sinhf(motionDistance);
+
+
+			vec3 anOtherPointThatDirection = hyperbolicPoints[i] * coshf(motionDistance + 2) + normalize(velocities[i]) * sinhf(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
+			// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
+
+			hyperbolicPoints[i] = hyperbolicPointsTemp;
+			vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * coshf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinhf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
+
+			printf("lorentz %f\n", length(newVelocityVector));
+
+			velocities[i] = length(velocities[i]) * newVelocityVector;
+		}
+		draw();
+
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
 		float distance = hyperbolicDistance(mirrorPoint, pointToMirror); // a tavolsag a pont es m1 kozott
@@ -360,6 +381,7 @@ public:
 	void move(vec3 hyperbolicMotionVector) {
 		float hyperbolicMotionVectorLength = hyperbolicDistance(hyperbolicMotionVector, vec3(0, 0, 1)); // az eltolas hossza
 		vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength)) / sinhf(hyperbolicMotionVectorLength); /// a hiperbolpid "origojaban" ervenyes iranyvektor
+
 
 		// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
 		vec3 m1 = vec3(0, 0, 1);
@@ -384,7 +406,7 @@ void onInitialization() {
 }
 
 // Window has become invalid: Redraw
-void onDisplay() {graph.draw();}
+void onDisplay() { graph.draw(); }
 
 // Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
@@ -436,11 +458,11 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 
 void onIdle() {
 	if (doForceBasedArrange) {
-		float dt = 0.03;
+		float dt = 0.01;
 		for (float t = 0; t < 1; t += dt) /// ido halad elore
 		{
- 			graph.forceBasedArrange(dt);
+			graph.forceBasedArrange(dt);
 		}
-		doForceBasedArrange = false;
+		//doForceBasedArrange = false;
 	}
 }
