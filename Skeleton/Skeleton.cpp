@@ -1,5 +1,4 @@
 //=============================================================================================
-// Mintaprogram: Zöld háromszög. Ervenyes 2019. osztol.
 //
 // A beadott program csak ebben a fajlban lehet, a fajl 1 byte-os ASCII karaktereket tartalmazhat, BOM kihuzando.
 // Tilos:
@@ -238,8 +237,7 @@ public:
 	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
 		for (int i = 0; i < numberOfPoints; i++)	// graf pontjainak generalasa
 		{
-			// Random koordinatak generalasa -1 es 1 koze
-			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
+			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f); // Random koordinatak generalasa -1 es 1 koze
 			float yCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] = descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
@@ -277,17 +275,14 @@ public:
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec2 sum = vec2(0, 0);
-			
 			for (int j = 0; j < numberOfPoints; j++)
 			{
 				if (i == j) continue; /// sajat maga nem szamit
 				if (areNeighbours(i, j)) {
-					
 					sum = sum + vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 				else
 				{
-					
 					sum = sum - vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 			}
@@ -304,7 +299,6 @@ public:
 	}
 	float pairForce(float distance) {
 		float force = 1 * log10f(distance / 0.5);
-		//float force = pow((distance - 0.2), 3) * 200;
 		if (force < -0.5) force = -0.5;
 		return 4 * force;
 	}
@@ -314,9 +308,8 @@ public:
 		return 1 * force;
 	}
 	float origoForce(float distance) {
-		
-		float force = distance * 3;
-		return 0.8 * force;
+		float force = distance * 2;
+		return force;
 	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
@@ -333,47 +326,34 @@ public:
 			vec3 FSum = vec3(0, 0, 0);
 			for (int j = 0; j < numberOfPoints; j++)
 			{
-				if (i == j) continue;
+				if (i == j) continue; // sajat maga nem szamit
 				float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
-				if (areNeighbours(i, j)) {
+				if (areNeighbours(i, j)) { // parok kozti ero
 					float forceSize = pairForce(dist);
 					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
 					FSum = FSum + forceDirection * forceSize;
-					//FSum = FSum + Fe(hyperbolicPoints[i], hyperbolicPoints[j]);
 				}
 				else {
-					float forceSize = notPairForce(dist);
+					float forceSize = notPairForce(dist); // nem parok kozti ero
 					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
 					FSum = FSum + forceDirection * forceSize;
-					//FSum = FSum + Fn(hyperbolicPoints[i], hyperbolicPoints[j]);
 				}
 			}
 			float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
 			float forceSize = origoForce(dist);
 			vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-			FSum = FSum + forceDirection * forceSize - 8 * pow(length(velocities[i]), 2) * velocities[i]; // origo korul tartas es surlodas
-			//FSum = FSum + Fo(hyperbolicPoints[i]);
-
-			velocities[i] = (velocities[i] + FSum * dt) - 0.1 * velocities[i]; // v = v + F * m, de m = 1
-
+			FSum = FSum + forceDirection * forceSize - 20 * pow(length(velocities[i]), 5) * velocities[i]; // origo korul tartas es surlodas
+			velocities[i] = (velocities[i] + FSum * dt); // v = v + F * m, de m = 1
 		}
 		for (int i = 0; i < numberOfPoints; i++) // a csucsok egyszerre mozgatasa
 		{
 			float motionDistance = length(velocities[i]) * dt; // v * t = s
-			//if (abs(motionDistance) < 0.005) { continue; }
 			vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * coshf(motionDistance) + normalize(velocities[i]) * sinhf(motionDistance);
-
-
 			vec3 anOtherPointThatDirection = hyperbolicPoints[i] * coshf(motionDistance + 2) + normalize(velocities[i]) * sinhf(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
-			// elvileg a tavolsaguk 1, ezert felesleges ujra kiszamolni TODO atirni
-
 			hyperbolicPoints[i] = hyperbolicPointsTemp;
 			vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * coshf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinhf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
-
 			velocities[i] = length(velocities[i]) * newVelocityVector;
 		}
-		//draw();
-
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
 		float distance = hyperbolicDistance(mirrorPoint, pointToMirror); // a tavolsag a pont es m1 kozott
@@ -384,55 +364,40 @@ public:
 	void move(vec3 hyperbolicMotionVector) {
 		float hyperbolicMotionVectorLength = hyperbolicDistance(hyperbolicMotionVector, vec3(0, 0, 1)); // az eltolas hossza
 		vec3 hyperbolicMotionVectorDirection = (hyperbolicMotionVector - vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength)) / sinhf(hyperbolicMotionVectorLength); /// a hiperbolpid "origojaban" ervenyes iranyvektor
-
-
-		// ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
-		vec3 m1 = vec3(0, 0, 1);
+		vec3 m1 = vec3(0, 0, 1); // ketto tukrozesi pont valasztasa az hiperbolikus szakasz egyenlete alapjan, fontos, hogy a ketto kozotti tavolsag fele legyen a kivant eltolas tavolsaganak
 		vec3 m2 = vec3(0, 0, 1) * coshf(hyperbolicMotionVectorLength / 2) + hyperbolicMotionVectorDirection * sinhf(hyperbolicMotionVectorLength / 2);
-
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec3 firstMirrored = hyperbolicMirror(hyperbolicPoints[i], m1); // pont tukrozese m1-re
 			hyperbolicPoints[i] = hyperbolicMirror(firstMirrored, m2); // m1-re tukrozott pont tukrozese m2-re, az igy kapott pont lesz az uj pozicioja
 		}
-		
 	}
 };
 
 Graph graph;
 
-// Initialization, create an OpenGL context
 void onInitialization() {
 	glViewport(0, 0, windowWidth, windowHeight);
 	gpuProgram.create(vertexSource, fragmentSource, "fragmentColor");
 	graph.create();
 }
 
-// Window has become invalid: Redraw
 void onDisplay() { graph.draw(); }
-
-// Key of ASCII code pressed
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == 'd') glutPostRedisplay();         // if d, invalidate display, i.e. redraw
-}
-
-// Key of ASCII code released
-void onKeyboardUp(unsigned char key, int pX, int pY) {
-	printf("Pressed: %d", key); // 32 a space
-	if (key == 32) {
+	if (key == 32 || key == ' ') {
 		graph.heuristicArrange();
 		graph.invokeForceBasedArrange();
 		graph.draw();
 	}
 }
+void onKeyboardUp(unsigned char key, int pX, int pY) {}
 
 vec2 motionStartCoordinates, motionEndCoordinates;
 bool rightClicked = false;
-// Move mouse with key pressed
-void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
+
+void onMouseMotion(int pX, int pY) {
 	if (rightClicked) {
-		// Convert to normalized device space
-		float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+		float cX = 2.0f * pX / windowWidth - 1;
 		float cY = 1.0f - 2.0f * pY / windowHeight;
 
 		motionEndCoordinates = vec2(cX, cY);
@@ -445,7 +410,6 @@ void onMouseMotion(int pX, int pY) {	// pX, pY are the pixel coordinates of the 
 	}
 }
 
-// Mouse click event
 void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
 	// Convert to normalized device space
 	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
@@ -461,16 +425,16 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 
 void onIdle() {
 	if (doForceBasedArrange) {
-		float dt = 0.03;
-		int drawEveryNthPicture = 100;
+		float dt = 0.02;
+		int drawEveryNthPicture = 100; // nem rajzolom ki minden idoegysegnel, mert az nagyon sokaig tartana
 		int picture = 0;
-		for (float t = 0; t < 15; t += dt) /// ido halad elore
+		for (float t = 0; t < 10; t += dt) // ido halad elore
 		{
 			graph.forceBasedArrange(dt);
 			picture++;
 			if (picture % drawEveryNthPicture == 0) {
 				graph.draw();
-				drawEveryNthPicture += 70;
+				drawEveryNthPicture += 70; // elsimitja az animacio veget
 			}
 		}
 		doForceBasedArrange = false;
