@@ -210,15 +210,16 @@ public:
 			Texture texture(width, height, image);
 			gpuProgram.setUniform(texture, "textureUnit");
 			vec2 descartes = vec2(hyperbolicPoints[i].x, hyperbolicPoints[i].y);
-			float w = hyperbolicPoints[i].z;
-			vec2 descartesXYvetulet = vec2(hyperbolicPoints[i].x / w, hyperbolicPoints[i].y / w);
 			vec2 circlePoints[20];
 			vec3 circlePointsHyperbolic[20];
-			for (int i = 0; i < 20; i++)
+			for (int j = 0; j < 20; j++)
 			{
-				float angleRad = 2.0f * M_PI * i / 20;
-				circlePoints[i] = descartes + vec2(cosf(angleRad) * 0.05, sinf(angleRad) * 0.05);
-				circlePointsHyperbolic[i] = descartesToHyperbolic(circlePoints[i]);
+				float angleRad = 2.0f * M_PI * j / 20;
+				circlePoints[j] = descartes + vec2(cosf(angleRad) * 1, sinf(angleRad) * 1);
+				circlePointsHyperbolic[j] = descartesToHyperbolic(circlePoints[j]); // ezek jo iranyok, de a tavolsaguk nem megfelelo
+				float distance = hyperbolicDistance(hyperbolicPoints[i], circlePointsHyperbolic[j]);
+				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
+				circlePointsHyperbolic[j] = hyperbolicPoints[i] * coshf(0.05) + direction * sinhf(0.05); // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba
 			}
 
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
@@ -271,21 +272,21 @@ public:
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec2 sum = vec2(0, 0);
-			int weight = 0;
+			
 			for (int j = 0; j < numberOfPoints; j++)
 			{
 				if (i == j) continue; /// sajat maga nem szamit
 				if (areNeighbours(i, j)) {
-					weight++;
+					
 					sum = sum + vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 				else
 				{
-					weight--;
+					
 					sum = sum - vec2(hyperbolicPoints[j].x, hyperbolicPoints[j].y);
 				}
 			}
-			sum = sum / weight;
+			sum = sum / (numberOfPoints - 1);
 			hyperbolicPoints[i] = descartesToHyperbolic(sum);
 		}
 	}
@@ -363,8 +364,6 @@ public:
 
 			hyperbolicPoints[i] = hyperbolicPointsTemp;
 			vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * coshf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinhf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
-
-
 
 			velocities[i] = length(velocities[i]) * newVelocityVector;
 		}
@@ -466,7 +465,7 @@ void onIdle() {
 			picture++;
 			if (picture % drawEveryNthPicture == 0) {
 				graph.draw();
-				//drawEveryNthPicture += 70;
+				drawEveryNthPicture += 70;
 			}
 		}
 		
