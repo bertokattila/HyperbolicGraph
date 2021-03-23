@@ -34,73 +34,72 @@
 
 // vertex shader
 const char* const vertexSource = R"(
-	#version 330									// Shader 3.3
-	precision highp float;							// normal floats, makes no difference on desktop computers
+	#version 330	// Shader 3.3
+	precision highp float;	// normal floats, makes no difference on desktop computers
 
-	uniform mat4 MVP;								// uniform variable, the Model-View-Projection transformation matrix
-	layout(location = 0) in vec3 vp;				// Varying input: vp = vertex position is expected in attrib array 0
-	layout(location = 1) in vec2 vertexUV;			// ezen a bemeneten jonnek a textura koordinatak
-	out vec2 texCoord;								// a textura koordinatakat tovabbadja
+	uniform mat4 MVP; // uniform variable, the Model-View-Projection transformation matrix
+	layout(location = 0) in vec3 vp; // Varying input: vp = vertex position is expected in attrib array 0
+	layout(location = 1) in vec2 vertexUV;	// ezen a bemeneten jonnek a textura koordinatak
+	out vec2 texCoord;	// a textura koordinatakat tovabbadja
 	void main() {
 		texCoord = vertexUV; // tovabbadom
-		gl_Position = vec4(vp.x/vp.z, vp.y/vp.z, 0, 1) * MVP;		// Homogen osztas megvalositasa
+		gl_Position = vec4(vp.x/vp.z, vp.y/vp.z, 0, 1) * MVP;	// homogen osztas megvalositasa
 	}
 )";
 
 // fragment shader
 const char* const fragmentSource = R"(
-	#version 330									// Shader 3.3
-	precision highp float;							// normal floats, makes no difference on desktop computers
+	#version 330 // Shader 3.3
+	precision highp float;	// normal floats, makes no difference on desktop computers
 
-	uniform sampler2D textureUnit;					// texturazo egyseg
-	uniform int useTexture;							// megadja, hogy a texturat kell hasznalni vagy a color valtozot
-	uniform vec3 color;								// uniform variable, the color of the primitive
+	uniform sampler2D textureUnit;	// texturazo egyseg
+	uniform int useTexture;	// megadja, hogy a texturat kell hasznalni vagy a color valtozot
+	uniform vec3 color;	// uniform variable, the color of the primitive
 	in vec2 texCoord;
-	out vec4 fragmentColor;							// computed color of the current pixel
+	out vec4 fragmentColor;	// computed color of the current pixel
 
 	void main() {
 		if (useTexture == 0){	
-			fragmentColor = vec4(color, 1);
+			fragmentColor = vec4(color, 1); // szinezes
 		} else {
-			fragmentColor = texture(textureUnit, texCoord);
+			fragmentColor = texture(textureUnit, texCoord); // texturazas
 		}
 	}
 )";
 
-GPUProgram gpuProgram; // vertex and fragment shaders
-unsigned int vao;	   // virtual world on the GPU
+GPUProgram gpuProgram;
+unsigned int vao;
 
-const int numberOfPoints = 50;
+const int numberOfPoints = 50; // graf pontjainak szama
 const int numberOfEdges = 61; // az osszes lehetseges el 5%-a ~ (50 alatt a 2) * 0.05
 bool doForceBasedArrange = false; // az onIdle figyeli, hogy mikor kell futnia az erovezere
 
 class Graph {
 public:
 	vec3 hyperbolicPoints[numberOfPoints]; /// a pontok (csucsok) koordinatai
-	vec4 colors[numberOfPoints];
-	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt
+	vec4 colors[numberOfPoints]; // a csucsokhoz tartozo egyedi szinek
+	struct PointPair { // elt reprezentalo struct, csak az egyszerubb hasznalat miatt, indexeket tarol
 		int a;
 		int b;
 	};
 
 	PointPair edges[numberOfEdges]; // pontok indexei, amik szomszedosak
-	std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai
 
 	int width = 64, height = 64;
-	std::vector<vec4> image; // proceduralisan eloallitott textura-kep
+	std::vector<vec4> textureImage; // proceduralisan eloallitott textura-kep
 	vec3 velocities[numberOfPoints];
 
 	void create() {
 		generateNewCoordinates(1, hyperbolicPoints);
-		generateNewColors(colors);
-		image.resize(width * height);
+		generateNewColors();
+		textureImage.resize(width * height);
 		srand(1);
 
 		for (int i = 0; i < numberOfEdges; i++)	// graf eleinek generalasa
 		{
-			bool edgeAlreadyExists = true;
 			int a;
 			int b;
+			bool edgeAlreadyExists = true;
 			while (edgeAlreadyExists)
 			{
 				a = rand() % numberOfPoints; // Random parok generalasa 0 es 49 koze
@@ -119,59 +118,51 @@ public:
 			edges[i].b = b;
 		}
 
-		glGenVertexArrays(1, &vao);	// get 1 vao id
-		glBindVertexArray(vao);		// make it active
+		glGenVertexArrays(1, &vao); // vao generalasa
+		glBindVertexArray(vao); // vao kivalasztasa
 
-		unsigned int vbo[2];		// az 0-as vbo lesz a pontoke, az 1-es pedig a textura pozicioke
-		glGenBuffers(2, vbo);	// Generate 2 buffer
-
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
-		glEnableVertexAttribArray(0);  // AttribArray 0
-		glVertexAttribPointer(0,       // vbo -> AttribArray 0
-			3, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
-			0, NULL); 		     // stride, offset: tightly packed
+		unsigned int vbo[2];	// az 0-as vbo lesz a pontoke, az 1-es pedig a textura pozicioke
+		glGenBuffers(2, vbo);	// a 2 vbo generalasa
 
 		vec2 uvs[20];
-		for (int i = 0; i < 20; i++)
+		for (int i = 0; i < 20; i++) // textura koordinatak generalasa
 		{
 			float angleRad = 2.0f * M_PI * i / 20;
-			uvs[i] = vec2(0.5, 0.5) + vec2(cosf(angleRad) * 0.5, sinf(angleRad) * 0.5);
+			uvs[i] = vec2(0.5, 0.5) + vec2(cosf(angleRad) * 0.5, sinf(angleRad) * 0.5); 
 		}
 
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[1]); // textura pontok az 1-es vbo-ba masolasa
 		glBufferData(GL_ARRAY_BUFFER, sizeof(uvs), uvs, GL_STATIC_DRAW);
-		glEnableVertexAttribArray(1);  // AttribArray 0
-		glVertexAttribPointer(1,       // vbo -> AttribArray 0
-			2, GL_FLOAT, GL_FALSE, // two floats/attrib, not fixed-point
-			0, NULL); 		     // stride, offset: tightly packed
+		glEnableVertexAttribArray(1); // az 1-es szamu attrib arrayen lesznek
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 
-		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]); // innentol a 0- as vbo legyen aktiv, minden masra az lesz hasznalva
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 	}
 	void draw() {
-		glClearColor(0, 0, 0, 0);     // background color
-		glClear(GL_COLOR_BUFFER_BIT); // clear frame buffer
-
+		glClearColor(0, 0, 0, 0); 
+		glClear(GL_COLOR_BUFFER_BIT);
+		
 		int colorLocation = glGetUniformLocation(gpuProgram.getId(), "color");
-		glUniform3f(colorLocation, 0, 1, 0); // 3 floats
+		glUniform3f(colorLocation, 0, 1, 0);
 		gpuProgram.setUniform(false, "useTexture");
 
-		float MVPtransf[4][4] = { 1, 0, 0, 0,    // MVP matrix, 
-								  0, 1, 0, 0,    // row-major!
+		float MVPtransf[4][4] = { 1, 0, 0, 0,
+								  0, 1, 0, 0,
 								  0, 0, 1, 0,
 								  0, 0, 0, 1 };
 
 		int MVPLocation = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
 		glUniformMatrix4fv(MVPLocation, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
-		glBindVertexArray(vao);  // Draw call
 
-		hyperbolicEdgeCoordinates.clear();
+		/////////////////////////////////////// Innentol elek rajzolasa ///////////////////////////////////////
+		std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai, ezt adom majd at a gpu-nak
 		for (int i = 0; i < numberOfEdges; i++)
 		{
 			hyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPoints[edges[i].a].x, hyperbolicPoints[edges[i].a].y, hyperbolicPoints[edges[i].a].z));
 			hyperbolicEdgeCoordinates.push_back(vec3(hyperbolicPoints[edges[i].b].x, hyperbolicPoints[edges[i].b].y, hyperbolicPoints[edges[i].b].z));
 		}
-
-		/////////////////////////////////////// Innentol elek rajzolasa ///////////////////////////////////////
 		glUniform3f(colorLocation, 1, 1, 0); // mas szinuek legyenek
 		glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 			sizeof(vec3) * hyperbolicEdgeCoordinates.size(),  // # bytes
@@ -185,37 +176,37 @@ public:
 
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			vec4 color1 = colors[i];
+			vec4 color1 = colors[i]; // a garantaltan egyedi szin az aktualis csucshoz, a tobbi szin is ebbol van lekepezve
 			vec4 color2 = vec4(colors[i].z, colors[i].x, colors[i].y, 1);
 			vec4 color3 = vec4(colors[i].y, colors[i].z, colors[i].x, 1);
 			vec4 color4 = vec4(1 - colors[i].x, 1 - colors[i].y, 1 - colors[i].z, 1);
 			for (int i = 0; i < width * height; i++)
 			{
 				float param = (float)i / (width * height);
-				image[i] = color2 * param + color4 * (1-param); // szinatmenet generalasa a bal felso es a jobb alvo szinekbol
+				textureImage[i] = color2 * param + color4 * (1-param); // szinatmenet generalasa a bal felso es a jobb alvo szinekbol
 			}
 			for (int y = 15; y < height - 15; y++) {
 				for (int x = 15; x < width - 15; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
 					if (x > 32 && y > 32) {
-						image[y * width + x] = color3;
+						textureImage[y * width + x] = color3;
 					}
 					else if (x > 32 && y < 32) {
-						image[y * width + x] = color2;
+						textureImage[y * width + x] = color2;
 					}
 					else if (x < 32 && y > 32) {
-						image[y * width + x] = color4;
+						textureImage[y * width + x] = color4;
 					}
 					else if (x < 32 && y < 32) {
-						image[y * width + x] = color1;
+						textureImage[y * width + x] = color1;
 					}
 				}
 			}
-			Texture texture(width, height, image);
+			Texture texture(width, height, textureImage);
 			gpuProgram.setUniform(texture, "textureUnit");
 			vec2 descartes = vec2(hyperbolicPoints[i].x, hyperbolicPoints[i].y);
 			vec2 circlePoints[20];
 			vec3 circlePointsHyperbolic[20];
-			for (int j = 0; j < 20; j++)
+			for (int j = 0; j < 20; j++) // poligon (kor kozelito) pontjainak generalasa
 			{
 				float angleRad = 2.0f * M_PI * j / 20;
 				circlePoints[j] = descartes + vec2(cosf(angleRad) * 1, sinf(angleRad) * 1);
@@ -226,23 +217,23 @@ public:
 			}
 			glLineWidth(2.0f);
 			
-			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
-				sizeof(vec3) * 20,  // # bytes
-				circlePointsHyperbolic,	      	// address
-				GL_DYNAMIC_DRAW);	// we do not change later
-			glDrawArrays(GL_TRIANGLE_FAN, 0 /*startIdx*/, 20 /*# Elements*/);
+			glBufferData(GL_ARRAY_BUFFER, // atmasolas a gpu-ra
+				sizeof(vec3) * 20,
+				circlePointsHyperbolic,
+				GL_DYNAMIC_DRAW);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, 20);
 		}
-		glutSwapBuffers(); // exchange buffers for double buffering
+		glutSwapBuffers();
 	}
 	void generateNewCoordinates(int seed, vec3 destinationArray[]) {
 		for (int i = 0; i < numberOfPoints; i++)	// graf pontjainak generalasa
 		{
-			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f); // Random koordinatak generalasa -1 es 1 koze
+			float xCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f); // random koordinatak generalasa -1 es 1 koze
 			float yCoordinate = 1.5 * ((((float)rand() / (float)RAND_MAX) * 2) - 1.0f);
 			destinationArray[i] = descartesToHyperbolic(vec2(xCoordinate, yCoordinate));
 		}
 	}
-	void generateNewColors(vec4 destinationArray[]) {
+	void generateNewColors() { // egyedi szint generalok mindegyik csucsnak
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			float epsilon = 0.001;
@@ -254,7 +245,7 @@ public:
 				g = (float)rand() / (float)RAND_MAX;
 				b = (float)rand() / (float)RAND_MAX;
 				match = false;
-				for (int j = 0; j < i; j++)
+				for (int j = 0; j < i; j++) // igazabol valoszinuleg egyediek, de biztonsag kedveert leellenorzom
 				{
 					if (fabs(r - colors[j].x) < epsilon && fabs(g - colors[j].y) < epsilon && fabs(b - colors[j].z) < epsilon) {
 						match = true;
@@ -265,13 +256,13 @@ public:
 			colors[i] = vec4(r, g, b, 1);
 		}
 	}
-	vec3 descartesToHyperbolic(vec2 descartes) {
+	vec3 descartesToHyperbolic(vec2 descartes) { // x,y koordinatapar ravetitese a parabolara
 		float x = descartes.x;
 		float y = descartes.y;
 		float w = sqrt((x * x) + (y * y) + 1);
 		return vec3(x, y, w);
 	}
-	void heuristicArrange() {// k means
+	void heuristicArrange() { // k means
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec2 sum = vec2(0, 0);
@@ -290,37 +281,36 @@ public:
 			hyperbolicPoints[i] = descartesToHyperbolic(sum);
 		}
 	}
-	bool areNeighbours(int i, int j) {
+	bool areNeighbours(int i, int j) { // ket index alapjan megmondja, hogy szomszedosak e a csucsok
 		for (int k = 0; k < numberOfPoints; k++)
 		{
 			if (edges[k].a == i && edges[k].b == j || edges[k].a == j && edges[k].b == i) return true;
 		}
 		return false;
 	}
-	float pairForce(float distance) {
+	float pairForce(float distance) { // szomszedos csucsok kozotti ero
 		float force = 1 * log10f(distance / 0.5);
-		if (force < -0.5) force = -0.5;
 		return 4 * force;
 	}
-	float notPairForce(float distance) {
+	float notPairForce(float distance) { // nem szomszedos csucsok kozotti ero
 		float force = -0.2 / pow(distance, 2);
-	if (force < -0.5) force = -0.5;
+		if (force < -0.5) force = -0.5;
 		return 1 * force;
 	}
-	float origoForce(float distance) {
+	float origoForce(float distance) { // az origo korul tarto ero, linearisan no, ahogy egyre no a tavolsag
 		float force = distance * 2;
 		return force;
 	}
-	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); }
-	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); }
-	void invokeForceBasedArrange() {
+	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); } // lorentz szorzat
+	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); } // ket (hiperbolan levo) pont hiperbolikus tavolsaga
+	void invokeForceBasedArrange() { // eroalapu rendezes elinditasa
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			velocities[i].x = 0; velocities[i].y = 0; velocities[i].z = 0;
 		}
 		doForceBasedArrange = true;
 	}
-	void forceBasedArrange(float dt) { // minden pont tomege 1
+	void forceBasedArrange(float dt) { // eroalapu rendezes egy kicsi delta t idore
 		for (int i = 0; i < numberOfPoints; i++)
 		{
 			vec3 FSum = vec3(0, 0, 0);
@@ -330,12 +320,12 @@ public:
 				float dist = hyperbolicDistance(hyperbolicPoints[i], hyperbolicPoints[j]);
 				if (areNeighbours(i, j)) { // parok kozti ero
 					float forceSize = pairForce(dist);
-					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist); // a hiperbola i pontjaban ervenyes irany a j fele
 					FSum = FSum + forceDirection * forceSize;
 				}
 				else {
 					float forceSize = notPairForce(dist); // nem parok kozti ero
-					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
+					vec3 forceDirection = (hyperbolicPoints[j] - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist); // a hiperbola i pontjaban ervenyes irany a j fele
 					FSum = FSum + forceDirection * forceSize;
 				}
 			}
@@ -402,7 +392,7 @@ void onMouseMotion(int pX, int pY) {
 
 		motionEndCoordinates = vec2(cX, cY);
 		vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
-		if (abs(descartesMotionVector.x) <= 0.001 || abs(descartesMotionVector.y) <= 0.001) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+		if (abs(descartesMotionVector.x) < 0.001 || abs(descartesMotionVector.y) < 0.001) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
 			return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
 		}
 		graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
@@ -410,9 +400,8 @@ void onMouseMotion(int pX, int pY) {
 	}
 }
 
-void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel coordinates of the cursor in the coordinate system of the operation system
-	// Convert to normalized device space
-	float cX = 2.0f * pX / windowWidth - 1;	// flip y axis
+void onMouse(int button, int state, int pX, int pY) {
+	float cX = 2.0f * pX / windowWidth - 1;
 	float cY = 1.0f - 2.0f * pY / windowHeight;
 	if (button == GLUT_RIGHT_BUTTON) {
 		motionStartCoordinates = vec2(cX, cY);
