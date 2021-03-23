@@ -190,20 +190,24 @@ public:
 			vec4 color2 = vec4(colors[i].z, colors[i].x, colors[i].y, 1);
 			vec4 color3 = vec4(colors[i].y, colors[i].z, colors[i].x, 1);
 			vec4 color4 = vec4(1 - colors[i].x, 1 - colors[i].y, 1 - colors[i].z, 1);
-
-			for (int y = 0; y < height; y++) {
-				for (int x = 0; x < width; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
+			for (int i = 0; i < width * height; i++)
+			{
+				float param = (float)i / (width * height);
+				image[i] = color2 * param + color4 * (1-param); // szinatmenet generalasa a bal felso es a jobb alvo szinekbol
+			}
+			for (int y = 15; y < height - 15; y++) {
+				for (int x = 15; x < width - 15; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
 					if (x > 32 && y > 32) {
-						image[y * width + x] = color1;
+						image[y * width + x] = color3;
 					}
 					else if (x > 32 && y < 32) {
 						image[y * width + x] = color2;
 					}
 					else if (x < 32 && y > 32) {
-						image[y * width + x] = color3;
+						image[y * width + x] = color4;
 					}
 					else if (x < 32 && y < 32) {
-						image[y * width + x] = color4;
+						image[y * width + x] = color1;
 					}
 				}
 			}
@@ -221,7 +225,8 @@ public:
 				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
 				circlePointsHyperbolic[j] = hyperbolicPoints[i] + direction * 0.05; // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba az erinto sikon
 			}
-
+			glLineWidth(2.0f);
+			
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
 				sizeof(vec3) * 20,  // # bytes
 				circlePointsHyperbolic,	      	// address
@@ -457,7 +462,7 @@ void onMouse(int button, int state, int pX, int pY) { // pX, pY are the pixel co
 void onIdle() {
 	if (doForceBasedArrange) {
 		float dt = 0.03;
-		int drawEveryNthPicture = 70;
+		int drawEveryNthPicture = 100;
 		int picture = 0;
 		for (float t = 0; t < 15; t += dt) /// ido halad elore
 		{
@@ -468,7 +473,6 @@ void onIdle() {
 				drawEveryNthPicture += 70;
 			}
 		}
-		
 		doForceBasedArrange = false;
 	}
 	graph.draw();
