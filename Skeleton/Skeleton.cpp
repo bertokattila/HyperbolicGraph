@@ -216,10 +216,10 @@ public:
 			{
 				float angleRad = 2.0f * M_PI * j / 20;
 				circlePoints[j] = descartes + vec2(cosf(angleRad) * 1, sinf(angleRad) * 1);
-				circlePointsHyperbolic[j] = descartesToHyperbolic(circlePoints[j]); // ezek jo iranyok, de a tavolsaguk nem megfelelo
+				circlePointsHyperbolic[j] = descartesToHyperbolic(circlePoints[j]); // ezek jo pontok az iranyvektorok meghatarozasahoz
 				float distance = hyperbolicDistance(hyperbolicPoints[i], circlePointsHyperbolic[j]);
 				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
-				circlePointsHyperbolic[j] = hyperbolicPoints[i] * coshf(0.05) + direction * sinhf(0.05); // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba
+				circlePointsHyperbolic[j] = hyperbolicPoints[i] + direction * 0.05; // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba az erinto sikon
 			}
 
 			glBufferData(GL_ARRAY_BUFFER, 	// Copy to GPU target
