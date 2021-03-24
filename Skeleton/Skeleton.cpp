@@ -93,7 +93,7 @@ public:
 		generateNewCoordinates(1, hyperbolicPoints);
 		generateNewColors();
 		textureImage.resize(width * height);
-		srand(1);
+		srand(554);
 
 		for (int i = 0; i < numberOfEdges; i++)	// graf eleinek generalasa
 		{
@@ -139,22 +139,23 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]); // innentol a 0- as vbo legyen aktiv, minden masra az lesz hasznalva
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+		float MVPtransf[4][4] = { 1, 0, 0, 0, 
+								  0, 1, 0, 0,
+								  0, 0, 1, 0,
+								  0, 0, 0, 1 };
+
+		int MVPLocation = glGetUniformLocation(gpuProgram.getId(), "MVP");
+		glUniformMatrix4fv(MVPLocation, 1, GL_TRUE, &MVPtransf[0][0]);
 	}
 	void draw() {
 		glClearColor(0, 0, 0, 0); 
 		glClear(GL_COLOR_BUFFER_BIT);
 		
 		int colorLocation = glGetUniformLocation(gpuProgram.getId(), "color");
-		glUniform3f(colorLocation, 0, 1, 0);
+		
 		gpuProgram.setUniform(false, "useTexture");
 
-		float MVPtransf[4][4] = { 1, 0, 0, 0,
-								  0, 1, 0, 0,
-								  0, 0, 1, 0,
-								  0, 0, 0, 1 };
-
-		int MVPLocation = glGetUniformLocation(gpuProgram.getId(), "MVP");	// Get the GPU location of uniform variable MVP
-		glUniformMatrix4fv(MVPLocation, 1, GL_TRUE, &MVPtransf[0][0]);	// Load a 4x4 row-major float matrix to the specified location
 
 		/////////////////////////////////////// Innentol elek rajzolasa ///////////////////////////////////////
 		std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai, ezt adom majd at a gpu-nak
@@ -215,7 +216,7 @@ public:
 				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
 				circlePointsHyperbolic[j] = hyperbolicPoints[i] + direction * 0.05; // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba az erinto sikon
 			}
-			glLineWidth(2.0f);
+			glLineWidth(1.5f);
 			
 			glBufferData(GL_ARRAY_BUFFER, // atmasolas a gpu-ra
 				sizeof(vec3) * 20,
@@ -290,16 +291,16 @@ public:
 	}
 	float pairForce(float distance) { // szomszedos csucsok kozotti ero
 		float force = 1 * log10f(distance / 0.5);
-		return 4 * force;
+		return 16 * force;
 	}
 	float notPairForce(float distance) { // nem szomszedos csucsok kozotti ero
 		float force = -0.2 / pow(distance, 2);
 		if (force < -0.5) force = -0.5;
-		return 1 * force;
+		return 4 * force;
 	}
 	float origoForce(float distance) { // az origo korul tarto ero, linearisan no, ahogy egyre no a tavolsag
 		float force = distance * 2;
-		return force;
+		return 5 * force;
 	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); } // lorentz szorzat
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); } // ket (hiperbolan levo) pont hiperbolikus tavolsaga
@@ -332,18 +333,22 @@ public:
 			float dist = hyperbolicDistance(hyperbolicPoints[i], vec3(0, 0, 1));
 			float forceSize = origoForce(dist);
 			vec3 forceDirection = (vec3(0, 0, 1) - (hyperbolicPoints[i] * coshf(dist))) / sinhf(dist);
-			FSum = FSum + forceDirection * forceSize - 20 * pow(length(velocities[i]), 5) * velocities[i]; // origo korul tartas es surlodas
-			velocities[i] = (velocities[i] + FSum * dt); // v = v + F * m, de m = 1
+			FSum = FSum + forceDirection * forceSize; // origo korul tartas
+			velocities[i] = (velocities[i] + FSum * dt) - velocities[i] * 0.2; // v = v + F * m, de m = 1 minusz a surlodas, ami a sebesseg vektoraval ellentetes iranyu
+			
 		}
 		for (int i = 0; i < numberOfPoints; i++) // a csucsok egyszerre mozgatasa
 		{
 			float motionDistance = length(velocities[i]) * dt; // v * t = s
 			vec3 hyperbolicPointsTemp = hyperbolicPoints[i] * coshf(motionDistance) + normalize(velocities[i]) * sinhf(motionDistance);
 			vec3 anOtherPointThatDirection = hyperbolicPoints[i] * coshf(motionDistance + 2) + normalize(velocities[i]) * sinhf(motionDistance + 2); // viszont most az sebessegvektor kimutatna a hiperbolikus sikbol, ezert generalok egy pontot a sebessegvektor egyenesen, de valamivel tavolabb
-			hyperbolicPoints[i] = hyperbolicPointsTemp;
+			hyperbolicPoints[i] = correctW(hyperbolicPointsTemp);
 			vec3 newVelocityVector = (anOtherPointThatDirection - hyperbolicPoints[i] * coshf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection))) / sinhf(hyperbolicDistance(hyperbolicPoints[i], anOtherPointThatDirection));
 			velocities[i] = length(velocities[i]) * newVelocityVector;
 		}
+	}
+	vec3 correctW(vec3 hyperbolicPoint) { // szerintem a float veges abrazolokepessege miatt el le tudna esni a hiperboloidrol, ez megmenti
+		return(descartesToHyperbolic(vec2(hyperbolicPoint.x, hyperbolicPoint.y)));
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
 		float distance = hyperbolicDistance(mirrorPoint, pointToMirror); // a tavolsag a pont es m1 kozott
@@ -392,7 +397,7 @@ void onMouseMotion(int pX, int pY) {
 
 		motionEndCoordinates = vec2(cX, cY);
 		vec2 descartesMotionVector = vec2((motionEndCoordinates - motionStartCoordinates).x, (motionEndCoordinates - motionStartCoordinates).y); // jelenlegi iteracioban az eger alapjan eltolasvektor
-		if (abs(descartesMotionVector.x) < 0.001 || abs(descartesMotionVector.y) < 0.001) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
+		if (abs(descartesMotionVector.x) < 0.0005 || abs(descartesMotionVector.y) < 0.0005) {// kis eltolasnal elszallnanak a pontok, szerintem azert mert pontatlan a float
 			return;	//  ezert ilyen kis eltolast nem engedek meg, de ha tovabb huzza az egeret, akkor egyszerre, amikor mar eleg nagy az eltolas, meg fog tortenni
 		}
 		graph.move(graph.descartesToHyperbolic(descartesMotionVector)); // az eltolasvektor hierbolikus megfelelojevel tortenik az eltolas
@@ -414,16 +419,16 @@ void onMouse(int button, int state, int pX, int pY) {
 
 void onIdle() {
 	if (doForceBasedArrange) {
-		float dt = 0.02;
-		int drawEveryNthPicture = 100; // nem rajzolom ki minden idoegysegnel, mert az nagyon sokaig tartana
+		float dt = 0.01;
+		int drawEveryNthPicture = 150; // nem rajzolom ki minden idoegysegnel, mert az nagyon sokaig tartana
 		int picture = 0;
-		for (float t = 0; t < 10; t += dt) // ido halad elore
+		for (float t = 0; t < 15; t += dt) // ido halad elore
 		{
 			graph.forceBasedArrange(dt);
 			picture++;
 			if (picture % drawEveryNthPicture == 0) {
 				graph.draw();
-				drawEveryNthPicture += 70; // elsimitja az animacio veget
+				drawEveryNthPicture += 50; // elsimitja az animacio veget
 			}
 		}
 		doForceBasedArrange = false;
