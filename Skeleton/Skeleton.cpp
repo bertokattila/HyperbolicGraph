@@ -93,7 +93,7 @@ public:
 		generateNewCoordinates(1, hyperbolicPoints);
 		generateNewColors();
 		textureImage.resize(width * height);
-		srand(554);
+		srand(556);
 
 		for (int i = 0; i < numberOfEdges; i++)	// graf eleinek generalasa
 		{
@@ -216,7 +216,7 @@ public:
 				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
 				circlePointsHyperbolic[j] = hyperbolicPoints[i] + direction * 0.05; // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba az erinto sikon
 			}
-			glLineWidth(1.5f);
+			
 			
 			glBufferData(GL_ARRAY_BUFFER, // atmasolas a gpu-ra
 				sizeof(vec3) * 20,
@@ -290,7 +290,7 @@ public:
 		return false;
 	}
 	float pairForce(float distance) { // szomszedos csucsok kozotti ero
-		float force = 1 * log10f(distance / 0.5);
+		float force = 1 * log10f(distance / 0.25);
 		return 16 * force;
 	}
 	float notPairForce(float distance) { // nem szomszedos csucsok kozotti ero
@@ -300,7 +300,7 @@ public:
 	}
 	float origoForce(float distance) { // az origo korul tarto ero, linearisan no, ahogy egyre no a tavolsag
 		float force = distance * 2;
-		return 5 * force;
+		return 10 * force;
 	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); } // lorentz szorzat
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); } // ket (hiperbolan levo) pont hiperbolikus tavolsaga
@@ -419,10 +419,10 @@ void onMouse(int button, int state, int pX, int pY) {
 
 void onIdle() {
 	if (doForceBasedArrange) {
-		float dt = 0.01;
+		float dt = 0.03;
 		int drawEveryNthPicture = 150; // nem rajzolom ki minden idoegysegnel, mert az nagyon sokaig tartana
 		int picture = 0;
-		for (float t = 0; t < 15; t += dt) // ido halad elore
+		for (float t = 0; t < 20; t += dt) // ido halad elore
 		{
 			graph.forceBasedArrange(dt);
 			picture++;
