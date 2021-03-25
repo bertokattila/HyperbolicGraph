@@ -84,10 +84,9 @@ public:
 	};
 
 	PointPair edges[numberOfEdges]; // pontok indexei, amik szomszedosak
-
-	int width = 64, height = 64;
+	int width = 64, height = 64; // texturak meretei
 	std::vector<vec4> textureImage; // proceduralisan eloallitott textura-kep
-	vec3 velocities[numberOfPoints];
+	vec3 velocities[numberOfPoints]; // erovezerelt rendezeshez hasznalt vektor
 
 	void create() {
 		generateNewCoordinates(1, hyperbolicPoints);
@@ -139,7 +138,6 @@ public:
 		glBindBuffer(GL_ARRAY_BUFFER, vbo[0]); // innentol a 0- as vbo legyen aktiv, minden masra az lesz hasznalva
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-
 		float MVPtransf[4][4] = { 1, 0, 0, 0, 
 								  0, 1, 0, 0,
 								  0, 0, 1, 0,
@@ -151,13 +149,9 @@ public:
 	void draw() {
 		glClearColor(0, 0, 0, 0); 
 		glClear(GL_COLOR_BUFFER_BIT);
-		
-		int colorLocation = glGetUniformLocation(gpuProgram.getId(), "color");
-		
+		int colorLocation = glGetUniformLocation(gpuProgram.getId(), "color");		
 		gpuProgram.setUniform(false, "useTexture");
 
-
-		/////////////////////////////////////// Innentol elek rajzolasa ///////////////////////////////////////
 		std::vector<vec3> hyperbolicEdgeCoordinates; // az elek vegpontjainak koordinatai, ezt adom majd at a gpu-nak
 		for (int i = 0; i < numberOfEdges; i++)
 		{
@@ -171,7 +165,6 @@ public:
 			GL_DYNAMIC_DRAW);	// we do not change later
 		glDrawArrays(GL_LINES, 0 /*startIdx*/, hyperbolicEdgeCoordinates.size() /*# Elements*/);
 
-		/////////////////////////////////////// Innentol a korok rajzolasa ///////////////////////////////////////
 		gpuProgram.setUniform(true, "useTexture");
 		glUniform3f(colorLocation, 1, 0, 0); // 3 floats
 
@@ -188,18 +181,10 @@ public:
 			}
 			for (int y = 15; y < height - 15; y++) {
 				for (int x = 15; x < width - 15; x++) { /// egyedi szinekbol allo textura generalasa mindegyik korre
-					if (x > 32 && y > 32) {
-						textureImage[y * width + x] = color3;
-					}
-					else if (x > 32 && y < 32) {
-						textureImage[y * width + x] = color2;
-					}
-					else if (x < 32 && y > 32) {
-						textureImage[y * width + x] = color4;
-					}
-					else if (x < 32 && y < 32) {
-						textureImage[y * width + x] = color1;
-					}
+					if (x > 32 && y > 32) { textureImage[y * width + x] = color3; }
+					else if (x > 32 && y < 32) { textureImage[y * width + x] = color2; }
+					else if (x < 32 && y > 32) { textureImage[y * width + x] = color4; }
+					else if (x < 32 && y < 32) { textureImage[y * width + x] = color1; }
 				}
 			}
 			Texture texture(width, height, textureImage);
@@ -216,7 +201,6 @@ public:
 				vec3 direction = (circlePointsHyperbolic[j] - hyperbolicPoints[i] * coshf(distance)) / sinhf(distance); // kiszamolom az ervenyes iranyvektort
 				circlePointsHyperbolic[j] = hyperbolicPoints[i] + direction * 0.05; // eltolom radius = 0.05 tavolsaggal a megfelelo iranyba az erinto sikon
 			}
-			
 			
 			glBufferData(GL_ARRAY_BUFFER, // atmasolas a gpu-ra
 				sizeof(vec3) * 20,
@@ -237,7 +221,7 @@ public:
 	void generateNewColors() { // egyedi szint generalok mindegyik csucsnak
 		for (int i = 0; i < numberOfPoints; i++)
 		{
-			float epsilon = 0.001;
+			float epsilon = 0.01;
 			float r, g, b;
 			bool match = true;
 			while (match)
@@ -290,17 +274,17 @@ public:
 		return false;
 	}
 	float pairForce(float distance) { // szomszedos csucsok kozotti ero
-		float force = 1 * log10f(distance / 0.25);
-		return 16 * force;
+		float force = 16 * log10f(distance / 0.25);
+		return force;
 	}
 	float notPairForce(float distance) { // nem szomszedos csucsok kozotti ero
 		float force = -0.2 / pow(distance, 2);
-		if (force < -0.5) force = -0.5;
+		if (force < -0.5) force = -0.5; // kis tavolsagnal brutalisan megnone, emiatt levagom
 		return 4 * force;
 	}
 	float origoForce(float distance) { // az origo korul tarto ero, linearisan no, ahogy egyre no a tavolsag
-		float force = distance * 2;
-		return 10 * force;
+		float force = distance * 20;
+		return force;
 	}
 	float lorentz(vec3 a, vec3 b) { return (a.x * b.x + a.y * b.y - a.z * b.z); } // lorentz szorzat
 	float hyperbolicDistance(vec3 a, vec3 b) { return acoshf(-lorentz(a, b)); } // ket (hiperbolan levo) pont hiperbolikus tavolsaga
@@ -347,7 +331,7 @@ public:
 			velocities[i] = length(velocities[i]) * newVelocityVector;
 		}
 	}
-	vec3 correctW(vec3 hyperbolicPoint) { // szerintem a float veges abrazolokepessege miatt el le tudna esni a hiperboloidrol, ez megmenti
+	vec3 correctW(vec3 hyperbolicPoint) { // szerintem a float pontatlansaga miatt kis mozgasnal le tudna esni a hiperboloidrol, ez megmenti
 		return(descartesToHyperbolic(vec2(hyperbolicPoint.x, hyperbolicPoint.y)));
 	}
 	vec3 hyperbolicMirror(vec3 pointToMirror, vec3 mirrorPoint) {
@@ -366,6 +350,7 @@ public:
 			vec3 firstMirrored = hyperbolicMirror(hyperbolicPoints[i], m1); // pont tukrozese m1-re
 			hyperbolicPoints[i] = hyperbolicMirror(firstMirrored, m2); // m1-re tukrozott pont tukrozese m2-re, az igy kapott pont lesz az uj pozicioja
 		}
+		draw();
 	}
 };
 
@@ -379,7 +364,7 @@ void onInitialization() {
 
 void onDisplay() { graph.draw(); }
 void onKeyboard(unsigned char key, int pX, int pY) {
-	if (key == 32 || key == ' ') {
+	if ((key == 32 || key == ' ') && !doForceBasedArrange) { // space lenyomasara indul a rendezes
 		graph.heuristicArrange();
 		graph.invokeForceBasedArrange();
 		graph.draw();
@@ -432,6 +417,6 @@ void onIdle() {
 			}
 		}
 		doForceBasedArrange = false;
+		graph.draw();
 	}
-	graph.draw();
 }
